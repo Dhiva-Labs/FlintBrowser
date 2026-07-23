@@ -1,0 +1,73 @@
+{
+  "name": "flint-browser",
+  "productName": "Flint Browser",
+  "version": "1.0.0",
+  "description": "Fast, private, batteries-included web browser by Dhiva Labs — built-in ad & tracker blocking, secure DNS, turbo downloads and reader mode.",
+  "main": "src/main/main.js",
+  "author": "Dhiva Labs <dhivakar1010@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/Dhiva-Labs/FlintBrowser",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dhiva-Labs/FlintBrowser.git"
+  },
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "smoke": "electron . --no-sandbox --smoke",
+    "test": "node --test",
+    "build:engine": "node scripts/build-adblock.js",
+    "build:icons": "node scripts/gen-icons.js",
+    "dist": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.dhivalabs.flint",
+    "productName": "Flint Browser",
+    "artifactName": "${name}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "scripts/smoke-run.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/adblock-engine.bin",
+        "to": "adblock-engine.bin"
+      }
+    ],
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage",
+        "tar.gz"
+      ],
+      "category": "Network;WebBrowser",
+      "icon": "build/icons",
+      "executableName": "flint-browser",
+      "synopsis": "Fast private browser with built-in ad blocking",
+      "desktop": {
+        "entry": {
+          "Name": "Flint Browser",
+          "GenericName": "Web Browser",
+          "StartupWMClass": "flint-browser",
+          "Categories": "Network;WebBrowser;",
+          "MimeType": "text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;"
+        }
+      }
+    },
+    "deb": {
+      "priority": "optional"
+    }
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "sharp": "^0.35.3"
+  },
+  "dependencies": {
+    "@ghostery/adblocker": "^2.18.1",
+    "@mozilla/readability": "^0.6.0"
+  }
+}

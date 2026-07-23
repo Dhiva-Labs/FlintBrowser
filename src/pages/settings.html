@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:;">
+  <title>Settings</title>
+  <link rel="stylesheet" href="/pages.css">
+</head>
+<body data-page="settings">
+  <div class="wrap">
+    <h1>Settings</h1>
+
+    <h2>General</h2>
+    <div class="card">
+      <div class="row">
+        <div class="grow"><div class="label">Search engine</div></div>
+        <select id="searchEngine"></select>
+      </div>
+      <div class="row">
+        <div class="grow"><div class="label">Theme</div></div>
+        <select id="theme">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="grow"><div class="label">Restore tabs on startup</div></div>
+        <label class="switch"><input type="checkbox" id="restoreSession"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div class="grow"><div class="label">Default browser</div><div class="sub">Open web links with Flint</div></div>
+        <button id="setDefault" class="small">Set as default</button>
+      </div>
+    </div>
+
+    <h2>Privacy &amp; blocking</h2>
+    <div class="card">
+      <div class="row">
+        <div class="grow"><div class="label">Block ads &amp; trackers</div><div class="sub" id="adblockStatus">EasyList + EasyPrivacy, applied at the network level</div></div>
+        <label class="switch"><input type="checkbox" id="adblockEnabled"><span class="knob"></span></label>
+      </div>
+      <div class="row" id="allowlistRow">
+        <div class="grow">
+          <div class="label">Sites where blocking is off</div>
+          <div id="allowlist"></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="grow"><div class="label">Clear browsing data</div><div class="sub">Cache, cookies and site data, history</div></div>
+        <div class="actions">
+          <button id="clearCache" class="small">Cache</button>
+          <button id="clearCookies" class="small">Cookies</button>
+          <button id="clearHistory" class="small">History</button>
+        </div>
+      </div>
+    </div>
+
+    <h2>Network</h2>
+    <div class="card">
+      <div class="row">
+        <div class="grow"><div class="label">Secure DNS (DNS-over-HTTPS)</div><div class="sub">Encrypts domain lookups</div></div>
+        <select id="dohMode">
+          <option value="off">Off</option>
+          <option value="automatic">When available</option>
+          <option value="secure">Always (strict)</option>
+        </select>
+      </div>
+      <div class="row" id="dohProviderRow">
+        <div class="grow"><div class="label">DNS provider</div></div>
+        <select id="dohProvider"></select>
+      </div>
+      <div class="row" id="dohCustomRow" hidden>
+        <div class="grow"><div class="label">Custom DoH URL</div></div>
+        <input type="url" id="dohCustom" placeholder="https://example.com/dns-query" style="width: 280px">
+      </div>
+      <div class="row">
+        <div class="grow"><div class="label">HTTPS-only mode</div><div class="sub">Never fall back to insecure HTTP</div></div>
+        <label class="switch"><input type="checkbox" id="httpsOnly"><span class="knob"></span></label>
+      </div>
+    </div>
+
+    <h2>Downloads</h2>
+    <div class="card">
+      <div class="row">
+        <div class="grow"><div class="label">Save files to</div><div class="sub" id="downloadDir"></div></div>
+        <button id="chooseDir" class="small">Change</button>
+      </div>
+      <div class="row">
+        <div class="grow"><div class="label">Turbo download connections</div><div class="sub">Parallel connections for accelerated downloads</div></div>
+        <select id="turboSegments">
+          <option value="4">4</option>
+          <option value="6">6</option>
+          <option value="8">8</option>
+          <option value="12">12</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <script src="/pages.js"></script>
+</body>
+</html>

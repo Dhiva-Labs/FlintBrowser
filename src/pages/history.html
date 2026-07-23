@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:;">
+  <title>History</title>
+  <link rel="stylesheet" href="/pages.css">
+</head>
+<body data-page="history">
+  <div class="wrap">
+    <h1>History <span class="count" id="count"></span></h1>
+    <div class="toolbar-line">
+      <input type="search" id="q" placeholder="Search history">
+      <button id="clearAll" class="danger">Clear all</button>
+    </div>
+    <div class="card" id="list"></div>
+  </div>
+  <script src="/pages.js"></script>
+</body>
+</html>

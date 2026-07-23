@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:;">
+  <title>About Flint</title>
+  <link rel="stylesheet" href="/pages.css">
+</head>
+<body data-page="about">
+  <div class="wrap">
+    <div class="about-hero">
+      <svg viewBox="0 0 64 64"><path d="M32 6c5 8.5 14.5 14 14.5 25A14.7 14.7 0 0 1 32 46 14.7 14.7 0 0 1 17.5 31c0-6 2.8-10.2 6-14-.3 4.4 1.3 7 3.8 8.3C26 19.8 27.4 12.4 32 6z" fill="#e8702a"/><path d="M32 26c2.6 4.2 6.5 7 6.5 11.6A6.4 6.4 0 0 1 32 44a6.4 6.4 0 0 1-6.5-6.4c0-3.4 1.7-5.8 3.4-8 .2 2 .9 3.2 2 3.9-.5-2.3-.1-5 1.1-7.5z" fill="#ffd9a0"/></svg>
+      <h1 style="justify-content:center">Flint Browser</h1>
+      <div class="v" id="version"></div>
+      <p style="margin-top:10px; color: var(--fg-dim)">Fast, private, batteries included. Made by Dhiva Labs.</p>
+    </div>
+
+    <h2>Engine</h2>
+    <div class="card" id="versions"></div>
+
+    <h2>Privacy</h2>
+    <div class="card">
+      <div class="row"><div class="grow"><div class="label">Zero telemetry</div><div class="sub">Flint sends nothing about you or your browsing anywhere. There are no analytics, no crash uploads, no phone-home.</div></div></div>
+    </div>
+
+    <h2>Open source</h2>
+    <div class="card">
+      <div class="row"><div class="grow"><div class="label">Flint Browser</div><div class="sub">MIT License — github.com/Dhiva-Labs/FlintBrowser</div></div><button class="small go" data-url="https://github.com/Dhiva-Labs/FlintBrowser">Open</button></div>
+      <div class="row"><div class="grow"><div class="label">Electron &amp; Chromium</div><div class="sub">MIT / BSD-style licenses</div></div></div>
+      <div class="row"><div class="grow"><div class="label">Ghostery adblocker</div><div class="sub">Mozilla Public License 2.0</div></div></div>
+      <div class="row"><div class="grow"><div class="label">EasyList &amp; EasyPrivacy</div><div class="sub">Filter lists, dual licensed CC BY-SA 3.0 / GPLv3</div></div></div>
+      <div class="row"><div class="grow"><div class="label">Mozilla Readability</div><div class="sub">Apache License 2.0</div></div></div>
+    </div>
+  </div>
+  <script src="/pages.js"></script>
+</body>
+</html>
