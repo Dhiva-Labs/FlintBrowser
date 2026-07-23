@@ -146,6 +146,12 @@ function renderSuggestions() {
     row.addEventListener('mousemove', () => { if (sugSel !== i) { sugSel = i; renderSuggestions(); } });
     sugEl.appendChild(row);
   });
+  // Anchor the dropdown to the address field so it tracks any window width
+  // instead of relying on fixed pixel insets.
+  const r = omnibox.getBoundingClientRect();
+  sugEl.style.left = `${Math.round(r.left)}px`;
+  sugEl.style.width = `${Math.round(r.width)}px`;
+  sugEl.style.right = 'auto';
   sugEl.hidden = false;
   syncOverlay();
 }

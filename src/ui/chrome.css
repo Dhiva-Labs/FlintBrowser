@@ -160,7 +160,7 @@ svg { display: block; }
 /* ---- overlay (suggestions / find bar / toast) ---- */
 #overlay { position: relative; }
 #suggestions {
-  position: absolute; top: 2px; left: 120px; right: 190px;
+  position: absolute; top: 2px; left: 120px;
   background: var(--pop-bg); border: 1px solid var(--border); border-radius: 12px;
   box-shadow: var(--pop-shadow); overflow: hidden; padding: 5px;
 }
