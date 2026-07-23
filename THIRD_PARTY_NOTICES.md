@@ -9,6 +9,7 @@ Flint Browser bundles or builds upon the following open-source software:
 | [EasyList](https://easylist.to/) | CC BY-SA 3.0 / GPLv3 (dual) | Ad blocking filter list (bundled as compiled engine) |
 | [EasyPrivacy](https://easylist.to/) | CC BY-SA 3.0 / GPLv3 (dual) | Tracker blocking filter list (bundled as compiled engine) |
 | [@mozilla/readability](https://github.com/mozilla/readability) | Apache-2.0 | Reader mode article extraction |
+| [WebTorrent](https://github.com/webtorrent/webtorrent) | MIT | BitTorrent client (Flint Plus only) |
 
 Full license texts ship with the respective packages in `node_modules` of the
 source tree and inside the application bundle.

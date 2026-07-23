@@ -201,6 +201,7 @@ function createStores(baseDir) {
     bookmarks: new BookmarkStore(path.join(baseDir, 'bookmarks.json')),
     downloads: new JsonStore(path.join(baseDir, 'downloads.json'), { items: [] }),
     session: new JsonStore(path.join(baseDir, 'session.json'), { windows: [] }),
+    torrents: new JsonStore(path.join(baseDir, 'torrents.json'), { magnets: [] }),
   };
 }
 

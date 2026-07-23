@@ -12,6 +12,29 @@
 
 ![Flint home page](docs/home.png)
 
+## Two editions
+
+Flint is built from one codebase in two editions:
+
+| | **Flint** (standard) | **Flint Plus** |
+|---|---|---|
+| Ad & tracker blocking, DoH, turbo downloads, reader mode, private windows | ✅ | ✅ |
+| BitTorrent client | — | ✅ |
+| Media grabber (direct downloads) | — | ✅ |
+| Distribution | Store-safe — PPA, stores, anywhere | GitHub / PPA (direct) |
+
+**Flint** is the clean, release-anywhere build: the standard package physically ships
+without the BitTorrent library or grabber code, not merely a disabled version.
+**Flint Plus** adds a BitTorrent client and a media downloader for power users.
+
+The media grabber only detects *direct, unencrypted* media a page already served
+(the way a download manager does). It never defeats DRM — DASH/EME streams are
+ignored and protected streaming services are blocklisted outright. The BitTorrent
+client ships no trackers, indexes or content; it is a neutral tool for lawful
+file sharing.
+
+![Flint Plus torrents](docs/torrents.png)
+
 ## Features
 
 - **Built-in ad & tracker blocking** — EasyList + EasyPrivacy applied at the network level (not an extension), with a per-site toggle and live blocked counters on every tab.
@@ -40,13 +63,15 @@ sudo apt install flint-browser
 ### Direct download
 
 Grab the latest `.deb`, `.AppImage` or `.tar.gz` from
-[Releases](https://github.com/Dhiva-Labs/FlintBrowser/releases).
+[Releases](https://github.com/Dhiva-Labs/FlintBrowser/releases) — `flint-browser-*`
+for the standard edition, `flint-browser-plus-*` for Flint Plus.
 
 ```bash
 sudo apt install ./flint-browser-1.0.0-amd64.deb
 ```
 
-The AppImage needs no installation: `chmod +x` and run.
+The AppImage needs no installation: `chmod +x` and run. The two editions install
+side by side (distinct app IDs and executables).
 
 ## Build from source
 
@@ -56,13 +81,16 @@ cd FlintBrowser
 npm install
 npm run build:engine   # compile the adblock engine from EasyList/EasyPrivacy
 npm run build:icons
-npm start
+npm start              # runs the Plus edition in dev; use npm run start:standard for standard
 ```
 
-Tests: `npm test` (unit) and `npm run smoke` (full in-app smoke suite with
-real navigation, adblock verification and a segmented-download check).
+Tests: `npm test` (unit) and `npm run smoke` (full in-app smoke suite — real
+navigation, adblock, segmented download, media-grabber sniff and a live
+BitTorrent transfer over a loopback tracker). `npm run smoke:standard` verifies
+the standard edition ships without the Plus features.
 
-Release artifacts: `npm run dist` → `dist/`.
+Release artifacts: `npm run dist` builds both editions into `dist/`
+(`npm run dist:standard` / `npm run dist:plus` for one).
 
 ## Architecture
 

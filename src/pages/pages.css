@@ -132,6 +132,9 @@ body[data-page="reader"] .reader-bar .grow { flex: 1; }
 #article blockquote { border-left: 3px solid var(--accent); padding-left: 16px; color: var(--fg-dim); margin: 0 0 1.1em; }
 body.sepia { --bg: #f4ecd8; --card: #faf4e4; --fg: #433422; --fg-dim: #7a6a52; --input-bg: #eadfc8; }
 
+/* torrents */
+.notice { color: var(--fg-dim); font-size: 12px; line-height: 1.6; margin-top: 18px; padding: 0 4px; }
+
 /* about */
 .about-hero { text-align: center; padding: 30px 0 10px; }
 .about-hero svg { width: 84px; height: 84px; }

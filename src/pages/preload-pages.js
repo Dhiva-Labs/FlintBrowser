@@ -13,6 +13,7 @@ const INVOKE = new Set([
   'pages:downloads', 'pages:download-action', 'pages:downloads-clear',
   'pages:top-sites', 'pages:navigate', 'pages:reader-get',
   'pages:set-default', 'pages:clear-data', 'pages:choose-download-dir',
+  'pages:torrents', 'pages:torrent-add', 'pages:torrent-action',
 ]);
 
 contextBridge.exposeInMainWorld('flintPages', {

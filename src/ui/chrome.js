@@ -272,10 +272,23 @@ function showToast(text) {
 }
 
 /* ---------- main -> chrome events ---------- */
+let features = {};
 flint.on('chrome:init', (init) => {
   document.body.classList.toggle('incognito', !!init.incognito);
   $('incog-badge').hidden = !init.incognito;
+  features = init.features || {};
+  // Grabber button exists only in editions with the media grabber.
+  $('btn-grabber').hidden = !features.mediaGrabber;
 });
+
+$('btn-grabber').addEventListener('click', () => flint.send('grabber:popup'));
+flint.on('grabber:badge', ({ count }) => {
+  const el = $('grab-count');
+  $('btn-grabber').classList.toggle('active', count > 0);
+  el.hidden = !count;
+  el.textContent = count > 9 ? '9+' : String(count);
+});
+flint.on('torrents:badge', () => { /* reserved for future toolbar indicator */ });
 flint.on('tabs:update', renderTabs);
 flint.on('active:update', renderActive);
 flint.on('chrome:focus-omni', () => { omniEditing = true; omni.focus(); omni.select(); });

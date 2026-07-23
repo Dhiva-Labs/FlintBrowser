@@ -87,6 +87,16 @@ class DownloadManager {
 
   attach(ses) {
     ses.on('will-download', (event, item) => {
+      // Route .torrent files to the torrent engine instead of saving them.
+      if (this.onTorrentFile) {
+        const isTorrent = /\.torrent($|\?)/i.test(item.getURL())
+          || item.getMimeType() === 'application/x-bittorrent';
+        if (isTorrent) {
+          event.preventDefault();
+          this.onTorrentFile(item.getURL());
+          return;
+        }
+      }
       const id = this._nextId++;
       const file = dedupePath(this.dir(), sanitizeFilename(item.getFilename()));
       item.setSavePath(file);

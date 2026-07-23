@@ -1,0 +1,8 @@
+@PKG@ (@VER@) noble; urgency=medium
+
+  * Initial release of @NAME@: tabbed Chromium-based browser with built-in
+    EasyList/EasyPrivacy ad and tracker blocking, DNS-over-HTTPS,
+    multi-connection turbo downloads with pause/resume, reader mode,
+    private windows, HTTPS-first mode, session restore and zero telemetry.
+
+ -- Dhivakar R <dhivakar1010@gmail.com>  Wed, 23 Jul 2026 14:30:00 +0530

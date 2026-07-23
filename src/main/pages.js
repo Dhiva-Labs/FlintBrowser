@@ -7,7 +7,7 @@ const { pathToFileURL } = require('url');
 const { protocol, net } = require('electron');
 
 const PAGES_DIR = path.join(__dirname, '..', 'pages');
-const KNOWN = new Set(['home', 'settings', 'history', 'bookmarks', 'downloads', 'about', 'reader']);
+const KNOWN = new Set(['home', 'settings', 'history', 'bookmarks', 'downloads', 'about', 'reader', 'torrents']);
 
 function registerScheme() {
   protocol.registerSchemesAsPrivileged([

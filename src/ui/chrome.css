@@ -146,6 +146,12 @@ svg { display: block; }
   border-radius: 8px; padding: 0 4px; min-width: 14px; text-align: center;
 }
 #btn-shield.off { opacity: 0.45; }
+#grab-count {
+  position: absolute; top: 1px; right: 0;
+  font-size: 9px; font-weight: 700; color: #fff; background: var(--accent);
+  border-radius: 8px; padding: 0 4px; min-width: 14px; text-align: center;
+}
+#btn-grabber.active { color: var(--accent); }
 #dl-dot {
   position: absolute; top: 4px; right: 5px; width: 8px; height: 8px;
   border-radius: 50%; background: var(--accent);

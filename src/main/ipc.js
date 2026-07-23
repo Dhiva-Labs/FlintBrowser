@@ -147,6 +147,13 @@ function registerIpc(ctx) {
 
   ipcMain.on('menu:popup', (event) => menus.hamburgerMenu(requireChrome(event)));
   ipcMain.on('downloads:open', (event) => requireChrome(event).tabs.create('flint://downloads'));
+  ipcMain.on('grabber:popup', (event) => menus.grabberMenu(requireChrome(event)));
+
+  ipcMain.handle('grabber:count', (event) => {
+    const w = requireChrome(event);
+    const t = w.tabs.active;
+    return ctx.grabber && t ? ctx.grabber.count(t.id) : 0;
+  });
 
   // ---------- internal pages ----------
 
@@ -165,6 +172,9 @@ function registerIpc(ctx) {
       },
       adblockReady: blocker.ready,
       downloadDir: dl.dir(),
+      edition: ctx.edition.id,
+      productName: ctx.edition.productName,
+      features: ctx.edition.features,
     };
   });
 
@@ -192,6 +202,21 @@ function registerIpc(ctx) {
   ipcMain.handle('pages:downloads-clear', (event) => { requirePages(event); dl.clearFinished(); return true; });
 
   ipcMain.handle('pages:top-sites', (event) => { requirePages(event); return stores.history.topSites(12); });
+
+  ipcMain.handle('pages:torrents', (event) => {
+    requirePages(event);
+    if (!ctx.torrents) return { available: false, torrents: [] };
+    return { available: ctx.torrents.available, error: ctx.torrents.error, torrents: ctx.torrents.list() };
+  });
+  ipcMain.handle('pages:torrent-add', (event, source) => {
+    requirePages(event);
+    if (!ctx.torrents) return { ok: false, error: 'Not available in this edition' };
+    return ctx.torrents.add(source);
+  });
+  ipcMain.handle('pages:torrent-action', (event, { infoHash, action }) => {
+    requirePages(event);
+    return ctx.torrents ? ctx.torrents.action(infoHash, action) : false;
+  });
 
   ipcMain.handle('pages:navigate', (event, input) => {
     requirePages(event);

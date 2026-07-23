@@ -56,10 +56,19 @@ class Tab {
     const sync = () => this.win.tabs.sync(this);
 
     wc.setWindowOpenHandler(({ url, disposition }) => {
-      if (url && /^(https?|flint):/i.test(url)) {
+      if (url && /^magnet:/i.test(url)) {
+        this.win.appCtx.handleMagnet(url, this.win);
+      } else if (url && /^(https?|flint):/i.test(url)) {
         this.win.tabs.create(url, { background: disposition === 'background-tab' });
       }
       return { action: 'deny' };
+    });
+
+    wc.on('will-navigate', (e, url) => {
+      if (/^magnet:/i.test(url)) {
+        e.preventDefault();
+        this.win.appCtx.handleMagnet(url, this.win);
+      }
     });
 
     wc.on('did-start-loading', sync);

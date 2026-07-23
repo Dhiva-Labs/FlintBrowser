@@ -57,6 +57,8 @@ class FlintWindow {
         incognito: this.incognito,
         dark: appCtx.darkTheme(),
         maximized: this.win.isMaximized(),
+        edition: appCtx.edition.id,
+        features: appCtx.edition.features,
       });
       this.tabs.sync();
       this.sendChrome('downloads:badge', appCtx.dl.summary());

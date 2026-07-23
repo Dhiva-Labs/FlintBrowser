@@ -12,12 +12,16 @@
     "url": "https://github.com/Dhiva-Labs/FlintBrowser.git"
   },
   "scripts": {
-    "start": "electron . --no-sandbox",
-    "smoke": "electron . --no-sandbox --smoke",
+    "start": "FLINT_EDITION=plus electron . --no-sandbox",
+    "start:standard": "FLINT_EDITION=standard electron . --no-sandbox",
+    "smoke": "FLINT_EDITION=plus electron . --no-sandbox --smoke",
+    "smoke:standard": "FLINT_EDITION=standard electron . --no-sandbox --smoke",
     "test": "node --test",
     "build:engine": "node scripts/build-adblock.js",
     "build:icons": "node scripts/gen-icons.js",
-    "dist": "electron-builder --linux"
+    "dist": "node scripts/dist.js standard && node scripts/dist.js plus",
+    "dist:standard": "node scripts/dist.js standard",
+    "dist:plus": "node scripts/dist.js plus"
   },
   "build": {
     "appId": "com.dhivalabs.flint",
@@ -68,6 +72,7 @@
   },
   "dependencies": {
     "@ghostery/adblocker": "^2.18.1",
-    "@mozilla/readability": "^0.6.0"
+    "@mozilla/readability": "^0.6.0",
+    "webtorrent": "^1.9.7"
   }
 }

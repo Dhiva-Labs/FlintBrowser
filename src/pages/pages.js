@@ -246,10 +246,77 @@ if (page === 'downloads') {
   window.addEventListener('beforeunload', () => clearInterval(timer));
 }
 
+/* ================= torrents ================= */
+if (page === 'torrents') {
+  let timer;
+  const fmtSpeed = (n) => n ? fmtBytes(n) + '/s' : '';
+  const add = async () => {
+    const v = $('magnet').value.trim();
+    if (!v) return;
+    const r = await call('pages:torrent-add', v);
+    if (r && r.ok) { $('magnet').value = ''; render(); }
+    else if (r && r.error) { $('magnet').value = ''; alertLine(r.error); }
+  };
+  const alertLine = (msg) => { const e = $('engine-error'); e.hidden = false; e.textContent = msg; };
+
+  const render = async () => {
+    const data = await call('pages:torrents');
+    if (!data.available) alertLine(data.error || 'Torrent engine unavailable in this edition.');
+    const items = data.torrents || [];
+    const list = $('list');
+    list.textContent = '';
+    $('count').textContent = items.length ? `${items.length}` : '';
+    if (!items.length) { list.appendChild(el('div', 'empty', 'No torrents. Paste a magnet link above to start.')); return; }
+    for (const t of items) {
+      const row = el('div', 'row');
+      const grow = el('div', 'grow');
+      grow.appendChild(el('div', 'label', t.name));
+      const pct = Math.round((t.progress || 0) * 100);
+      const bits = [
+        t.done ? 'Seeding' : (t.paused ? 'Paused' : `${pct}%`),
+        fmtBytes(t.downloaded) + (t.size ? ' / ' + fmtBytes(t.size) : ''),
+        `${t.peers} peer${t.peers === 1 ? '' : 's'}`,
+      ];
+      if (!t.done && !t.paused && t.downloadSpeed) bits.push('↓ ' + fmtSpeed(t.downloadSpeed));
+      if (t.uploadSpeed) bits.push('↑ ' + fmtSpeed(t.uploadSpeed));
+      if (t.error) bits.push(t.error);
+      grow.appendChild(el('div', 'sub', bits.filter(Boolean).join(' · ')));
+      const bar = el('div', 'progress');
+      const fill = el('div');
+      fill.style.width = pct + '%';
+      if (t.done) fill.style.background = '#3d9e57';
+      bar.appendChild(fill);
+      grow.appendChild(bar);
+      row.appendChild(grow);
+      const actions = el('div', 'actions');
+      const btn = (label, act, cls) => {
+        const b = el('button', 'small' + (cls ? ' ' + cls : ''), label);
+        b.addEventListener('click', async () => { await call('pages:torrent-action', { infoHash: t.infoHash, action: act }); render(); });
+        actions.appendChild(b);
+      };
+      if (t.done) btn('Folder', 'open', 'primary');
+      else if (t.paused) btn('Resume', 'resume', 'primary');
+      else btn('Pause', 'pause');
+      btn('Remove', 'remove');
+      btn('Delete data', 'remove-data', 'danger');
+      row.appendChild(actions);
+      list.appendChild(row);
+    }
+  };
+  $('add').addEventListener('click', add);
+  $('magnet').addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+  render();
+  timer = setInterval(render, 900);
+  window.addEventListener('beforeunload', () => clearInterval(timer));
+}
+
 /* ================= about ================= */
 if (page === 'about') {
   call('pages:boot').then((b) => {
-    $('version').textContent = `Version ${b.versions.app}`;
+    document.title = 'About ' + b.productName;
+    $('product').textContent = b.productName;
+    $('version').textContent = `Version ${b.versions.app} · ${b.edition} edition`;
+    if (b.features && b.features.torrents) $('plus-notice').hidden = false;
     const box = $('versions');
     const kv = (k, v) => {
       const row = el('div', 'kv');

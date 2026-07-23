@@ -5,6 +5,14 @@
 const { Menu, clipboard, app } = require('electron');
 const { searchUrl } = require('./omni');
 
+function fmtBytes(n) {
+  if (!n) return '';
+  const u = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return `${n < 10 && i ? n.toFixed(1) : Math.round(n)} ${u[i]}`;
+}
+
 function buildMenus(ctx) {
   const withWin = (fn) => () => {
     const w = ctx.wm.focused();
@@ -125,9 +133,10 @@ function buildMenus(ctx) {
         { label: 'Bookmarks', accelerator: 'CmdOrCtrl+Shift+O', click: () => actions.openPage('bookmarks') },
         { label: 'History', accelerator: 'CmdOrCtrl+H', click: () => actions.openPage('history') },
         { label: 'Downloads', accelerator: 'CmdOrCtrl+J', click: () => actions.openPage('downloads') },
+        ...(ctx.edition.features.torrents ? [{ label: 'Torrents', click: () => actions.openPage('torrents') }] : []),
         { type: 'separator' },
         { label: 'Settings', click: () => actions.openPage('settings') },
-        { label: 'About Flint', click: () => actions.openPage('about') },
+        { label: `About ${ctx.edition.productName}`, click: () => actions.openPage('about') },
       ],
     },
   ];
@@ -143,6 +152,7 @@ function buildMenus(ctx) {
       { label: 'Bookmarks', click: () => actions.openPage('bookmarks') },
       { label: 'History', click: () => actions.openPage('history') },
       { label: 'Downloads', click: () => actions.openPage('downloads') },
+      ...(ctx.edition.features.torrents ? [{ label: 'Torrents', click: () => actions.openPage('torrents') }] : []),
       { type: 'separator' },
       { label: 'Zoom In', click: () => actions.zoom(0.5) },
       { label: 'Zoom Out', click: () => actions.zoom(-0.5) },
@@ -152,11 +162,27 @@ function buildMenus(ctx) {
       { label: 'Print…', click: actions.print },
       { type: 'separator' },
       { label: 'Settings', click: () => actions.openPage('settings') },
-      { label: 'About Flint', click: () => actions.openPage('about') },
+      { label: `About ${ctx.edition.productName}`, click: () => actions.openPage('about') },
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() },
     ]);
     popup(menu, fwin);
+  }
+
+  function grabberMenu(fwin) {
+    const tab = fwin.tabs.active;
+    const items = tab && ctx.grabber ? ctx.grabber.list(tab.id) : [];
+    const template = items.length ? items.map((m) => ({
+      label: `${m.kind === 'audio' ? '♪ ' : '▶ '}${m.name}${m.size ? '  ·  ' + fmtBytes(m.size) : ''}`,
+      click: () => ctx.dl.startTurbo(m.url, tab.wc.session),
+    })) : [{ label: 'No downloadable media on this page', enabled: false }];
+    if (items.length) {
+      template.push({ type: 'separator' }, {
+        label: 'Download all',
+        click: () => items.forEach((m) => ctx.dl.startTurbo(m.url, tab.wc.session)),
+      });
+    }
+    popup(Menu.buildFromTemplate(template), fwin);
   }
 
   function popup(menu, fwin) {
@@ -168,7 +194,13 @@ function buildMenus(ctx) {
     const items = [];
     const engine = ctx.stores.settings.get().searchEngine;
 
-    if (params.linkURL) {
+    if (params.linkURL && /^magnet:/i.test(params.linkURL) && ctx.torrents) {
+      items.push(
+        { label: 'Open Magnet in Flint', click: () => ctx.handleMagnet(params.linkURL, fwin) },
+        { label: 'Copy Magnet Link', click: () => clipboard.writeText(params.linkURL) },
+        { type: 'separator' },
+      );
+    } else if (params.linkURL) {
       items.push(
         { label: 'Open Link in New Tab', click: () => fwin.tabs.create(params.linkURL, { background: true }) },
         { label: 'Copy Link Address', click: () => clipboard.writeText(params.linkURL) },
@@ -213,7 +245,7 @@ function buildMenus(ctx) {
     popup(Menu.buildFromTemplate(items), fwin);
   }
 
-  return { actions, hamburgerMenu, pageContextMenu };
+  return { actions, hamburgerMenu, pageContextMenu, grabberMenu };
 }
 
 module.exports = { buildMenus };

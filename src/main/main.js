@@ -9,6 +9,7 @@ const { app, session, nativeTheme } = require('electron');
 const pages = require('./pages');
 const doh = require('./doh');
 const reader = require('./reader');
+const { edition } = require('./edition');
 const { createStores } = require('./state');
 const { AdBlocker } = require('./adblock');
 const { DownloadManager } = require('./downloads');
@@ -41,6 +42,7 @@ function boot() {
   app.on('second-instance', (event, argv2) => {
     const w = ctx.wm && ctx.wm.focused();
     if (!w) return;
+    for (const u of argv2.slice(1)) if (/^magnet:/i.test(u) && ctx.handleMagnet) ctx.handleMagnet(u, w);
     const urls = extractUrls(argv2.slice(1));
     for (const u of urls) w.tabs.create(u);
     if (w.win.isMinimized()) w.win.restore();
@@ -75,8 +77,34 @@ function boot() {
     const dl = new DownloadManager(stores.downloads, stores.settings);
     ctx.dl = dl;
 
+    ctx.edition = edition;
     ctx.doh = doh;
     ctx.reader = reader;
+
+    // ---- Flint Plus features (loaded only when the edition enables them) ----
+    if (edition.features.mediaGrabber) {
+      const { MediaGrabber } = require('./grabber');
+      ctx.grabber = new MediaGrabber();
+      ctx.grabber.onFound = (wcId, count) => {
+        if (!ctx.wm) return;
+        for (const w of ctx.wm.windows) {
+          const tab = w.tabs.byWebContentsId(wcId);
+          if (tab && tab.id === w.tabs.activeId) w.sendChrome('grabber:badge', { count });
+        }
+      };
+    }
+    if (edition.features.torrents) {
+      const { TorrentEngine } = require('./torrents');
+      ctx.torrents = new TorrentEngine(stores.torrents, () => dl.dir());
+      ctx.torrents.onChange = () => { if (ctx.wm) ctx.wm.broadcast('torrents:badge', ctx.torrents.summary()); };
+      dl.onTorrentFile = (url) => ctx.torrents.add(url);
+    }
+
+    ctx.handleMagnet = (url, win) => {
+      if (!ctx.torrents) return;
+      ctx.torrents.add(url);
+      (win || ctx.wm.focused()).tabs.create('flint://torrents');
+    };
     ctx.iconPath = path.join(__dirname, '..', '..', 'build', 'icons', '512x512.png');
     ctx.darkTheme = () => nativeTheme.shouldUseDarkColors;
 
@@ -101,6 +129,7 @@ function boot() {
       pages.attach(ses);
       blocker.attach(ses);
       dl.attach(ses);
+      if (ctx.grabber) ctx.grabber.attach(ses);
 
       ses.setPermissionRequestHandler((wc, permission, callback, details) => {
         const autoAllow = new Set(['fullscreen', 'pointerLock', 'clipboard-sanitized-write', 'mediaKeySystem']);
@@ -160,6 +189,8 @@ function boot() {
       wm.restore();
       const w = wm.focused();
       if (w && initialUrls.length) for (const u of initialUrls) w.tabs.create(u);
+      if (ctx.torrents) ctx.torrents.restore();
+      for (const u of process.argv) if (/^magnet:/i.test(u) && ctx.torrents) ctx.handleMagnet(u, wm.focused());
     }
   });
 
@@ -178,6 +209,7 @@ function flushAll(ctx) {
     ctx.stores.history.flush();
     ctx.stores.bookmarks.flush();
     ctx.stores.session.flush();
+    ctx.stores.torrents.flush();
     ctx.dl.flush();
   } catch { /* shutting down */ }
 }

@@ -1,4 +1,4 @@
-Source: flint-browser
+Source: @PKG@
 Section: web
 Priority: optional
 Maintainer: Dhivakar R <dhivakar1010@gmail.com>
@@ -7,13 +7,13 @@ Standards-Version: 4.6.2
 Homepage: https://github.com/Dhiva-Labs/FlintBrowser
 Rules-Requires-Root: no
 
-Package: flint-browser
+Package: @PKG@
 Architecture: amd64
 Depends: ${misc:Depends}, libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0
-Description: Fast, private web browser with built-in ad blocking
- Flint is a fast, private, batteries-included web browser by Dhiva Labs.
+Description: Fast, private web browser (@NAME@) with built-in ad blocking
+ @NAME@ is a fast, private, batteries-included web browser by Dhiva Labs.
  .
  Built-in EasyList/EasyPrivacy ad and tracker blocking at the network
- level, DNS-over-HTTPS with selectable providers, multi-connection
- turbo downloads with pause and resume, reader mode, private windows,
+ level, DNS-over-HTTPS with selectable providers, multi-connection turbo
+ downloads with pause and resume, reader mode, private windows,
  HTTPS-first mode, session restore, and zero telemetry.

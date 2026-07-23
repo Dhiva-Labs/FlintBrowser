@@ -1,5 +1,6 @@
 node_modules/
 dist/
+src/edition-config.json
 *.log
 .tmp/
 smoke-out/

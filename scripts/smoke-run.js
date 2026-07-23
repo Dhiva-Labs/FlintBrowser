@@ -39,7 +39,7 @@ module.exports = async function smoke(ctx) {
     fs.writeFileSync(path.join(outDir, name), img.toPNG());
   };
 
-  console.log('[smoke] starting, output:', outDir);
+  console.log('[smoke] starting, edition:', ctx.edition.id, '— output:', outDir);
   const w = ctx.wm.create({});
   await settle(1500);
 
@@ -149,6 +149,96 @@ module.exports = async function smoke(ctx) {
     if (!ctx.doh.apply(app, { mode: 'secure', provider: 'cloudflare' })) throw new Error('apply failed');
     ctx.doh.apply(app, ctx.stores.settings.get().doh);
   });
+
+  // ---- Flint Plus features ----
+  if (ctx.edition.features.mediaGrabber) {
+    await t('grabber sniffs a direct media file', async () => {
+      const media = crypto.randomBytes(200 * 1024);
+      const server = http.createServer((req, res) => {
+        if (req.url === '/clip.mp4') {
+          res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': media.length });
+          res.end(media);
+        } else {
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end('<!doctype html><meta charset=utf8><body>media page<script>fetch("/clip.mp4")</script>');
+        }
+      });
+      await new Promise((r) => server.listen(0, '127.0.0.1', r));
+      const port = server.address().port;
+      const tab = w.tabs.create(`http://127.0.0.1:${port}/`);
+      await settle(400);
+      await waitLoad(tab.wc);
+      await settle(1200);
+      server.close();
+      const found = ctx.grabber.list(tab.id);
+      if (!found.some((m) => m.url.endsWith('/clip.mp4') && m.kind === 'video')) {
+        throw new Error('media not detected: ' + JSON.stringify(found));
+      }
+    });
+
+    await t('grabber refuses blocklisted streaming services', async () => {
+      const { classify } = require('../src/main/grabber');
+      if (classify('https://rr3---sn-abc.googlevideo.com/videoplayback?x=1', 'video/mp4', 5e6) !== null) {
+        throw new Error('googlevideo should be blocklisted');
+      }
+      if (classify('https://cdn.example.com/movie.mp4', 'video/mp4', 5e6) === null) {
+        throw new Error('plain direct mp4 should be grabbable');
+      }
+    });
+  } else {
+    await t('standard edition has no media grabber', async () => {
+      if (ctx.grabber) throw new Error('grabber should not exist in standard edition');
+    });
+  }
+
+  if (ctx.edition.features.torrents) {
+    await t('torrent client transfers over a loopback tracker', async () => {
+      const { Server } = require('bittorrent-tracker');
+      const WebTorrent = require('webtorrent');
+      const tracker = new Server({ udp: false, ws: false, http: true, stats: false });
+      await new Promise((r) => tracker.listen(0, '127.0.0.1', r));
+      const announce = `http://127.0.0.1:${tracker.http.address().port}/announce`;
+      const data = crypto.randomBytes(512 * 1024);
+      const leechDir = path.join(outDir, 'torrent-leech');
+      fs.mkdirSync(leechDir, { recursive: true });
+      const leech = new WebTorrent({ dht: false, lsd: false });
+
+      try {
+        await new Promise((resolve, reject) => {
+          const to = setTimeout(() => reject(new Error('transfer timed out')), 40000);
+          ctx.torrents.seed(data, { name: 'flint-selftest.bin', announce: [announce] }, (err, seeded) => {
+            if (err) { clearTimeout(to); return reject(err); }
+            leech.add(seeded.torrentFile, { path: leechDir, announce: [announce] }, (lt) => {
+              lt.on('error', (e) => { clearTimeout(to); reject(e); });
+              lt.on('done', () => {
+                clearTimeout(to);
+                try {
+                  const got = fs.readFileSync(path.join(lt.path, lt.files[0].path));
+                  if (!got.equals(data)) return reject(new Error('bytes differ after transfer'));
+                  resolve();
+                } catch (e) { reject(e); }
+              });
+            });
+          });
+        });
+      } finally {
+        await new Promise((r) => leech.destroy(r));
+        await new Promise((r) => tracker.close(r));
+      }
+    });
+
+    await t('flint://torrents page loads', async () => {
+      const tt = w.tabs.create('flint://torrents');
+      await settle(300);
+      await waitLoad(tt.wc);
+      await settle(500);
+      await shot('content-torrents.png', tt.wc);
+    });
+  } else {
+    await t('standard edition has no torrent engine', async () => {
+      if (ctx.torrents) throw new Error('torrents should not exist in standard edition');
+    });
+  }
 
   console.log(`[smoke] done: ${passed} passed, ${failed} failed`);
   return failed ? 1 : 0;
