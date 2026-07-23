@@ -9,7 +9,10 @@
 #         scripts/publish-ppa.sh standard   # just one
 set -euo pipefail
 
-KEY="32CC792311A6EF76"
+# Must be the key registered with Launchpad (the RSA one, same as
+# DEBSIGN_KEYID in ~/.devscripts) — the ed25519 key is not registered
+# there and Launchpad silently rejects uploads signed with it.
+KEY="0D3EFC9C8CE20ADE3CE809AD3D8D857AAF4D50E6"
 PPA="ppa:dhiva-labs/apps"
 BUILD="$(cd "$(dirname "$0")/.." && pwd)/packaging/ppa/build"
 
