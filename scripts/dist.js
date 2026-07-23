@@ -59,7 +59,14 @@ if (editionId === 'standard') {
     '!src/main/torrents.js',
     '!src/main/grabber.js',
     '!src/pages/torrents.html',
+    // Drop the entire BitTorrent stack (incl. the native utp-native transport)
+    // so the clean edition carries no torrent code at all.
     '!node_modules/webtorrent/**/*',
+    '!node_modules/utp-native/**/*',
+    '!node_modules/bittorrent-*/**/*',
+    '!node_modules/*-torrent*/**/*',
+    '!node_modules/{ut_metadata,ut_pex,ut_hole_punch,lt_donthave}/**/*',
+    '!node_modules/{k-rpc,k-rpc-socket}/**/*',
   ];
 }
 config.linux.desktop = config.linux.desktop || { entry: {} };
