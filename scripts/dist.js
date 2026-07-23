@@ -73,10 +73,20 @@ config.linux.desktop = config.linux.desktop || { entry: {} };
 config.linux.desktop.entry.Name = e.productName;
 config.linux.desktop.entry.StartupWMClass = e.exe;
 
-console.log(`\n=== Building ${e.productName} (${editionId}) ===\n`);
+// Build for the host OS: Linux packages on Linux, an NSIS installer on Windows.
+let targets;
+if (process.platform === 'win32') {
+  targets = Platform.WINDOWS.createTarget(['nsis']);
+} else if (process.platform === 'darwin') {
+  targets = Platform.MAC.createTarget(['dmg', 'zip']);
+} else {
+  targets = Platform.LINUX.createTarget(['deb', 'AppImage', 'tar.gz']);
+}
+
+console.log(`\n=== Building ${e.productName} (${editionId}) for ${process.platform} ===\n`);
 
 build({
-  targets: Platform.LINUX.createTarget(['deb', 'AppImage', 'tar.gz']),
+  targets,
   config,
 }).then((files) => {
   console.log('\nArtifacts:');

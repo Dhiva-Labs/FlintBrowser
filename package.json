@@ -63,11 +63,22 @@
     },
     "deb": {
       "priority": "optional"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${name}-${version}-${arch}.${ext}"
     }
   },
   "devDependencies": {
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
+    "png-to-ico": "^2.1.8",
     "sharp": "^0.35.3"
   },
   "dependencies": {

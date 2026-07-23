@@ -1,0 +1,86 @@
+name: Build installers
+
+# Builds native installers on real runners and attaches them to a release.
+# Windows .exe installers can't be produced on the Linux dev box (no Wine),
+# so they are built here on windows-latest.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to upload artifacts to'
+        required: true
+        default: 'v1.0.0'
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [standard, plus]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build adblock engine
+        run: npm run build:engine
+
+      - name: Build icons
+        run: npm run build:icons
+
+      - name: Build ${{ matrix.edition }} installer
+        run: node scripts/dist.js ${{ matrix.edition }}
+
+      - name: Upload installer to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        run: |
+          gh release upload "$TAG" dist/*.exe --clobber --repo "$GITHUB_REPOSITORY"
+
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [standard, plus]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build adblock engine
+        run: npm run build:engine
+
+      - name: Build icons
+        run: npm run build:icons
+
+      - name: Build ${{ matrix.edition }} packages
+        run: node scripts/dist.js ${{ matrix.edition }}
+
+      - name: Upload packages to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        run: |
+          gh release upload "$TAG" dist/*.deb dist/*.AppImage "dist/"*.tar.gz --clobber --repo "$GITHUB_REPOSITORY"
