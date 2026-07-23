@@ -88,6 +88,7 @@ console.log(`\n=== Building ${e.productName} (${editionId}) for ${process.platfo
 build({
   targets,
   config,
+  publish: 'never', // the CI workflow uploads artifacts itself
 }).then((files) => {
   console.log('\nArtifacts:');
   for (const f of files) if (/\.(deb|AppImage|tar\.gz)$/.test(f)) console.log('  ' + path.basename(f));

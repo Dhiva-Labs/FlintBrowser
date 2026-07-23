@@ -67,9 +67,9 @@ function boot() {
     doh.apply(app, stores.settings.get().doh);
 
     const blocker = new AdBlocker(stores.settings);
-    const enginePath = app.isPackaged
-      ? path.join(process.resourcesPath, 'adblock-engine.bin')
-      : path.join(__dirname, '..', '..', 'build', 'adblock-engine.bin');
+    // The engine is bundled inside the app (app.asar in packaged builds);
+    // Electron's fs reads transparently through the asar archive.
+    const enginePath = path.join(__dirname, '..', '..', 'build', 'adblock-engine.bin');
     if (fs.existsSync(enginePath)) blocker.load(enginePath);
     else console.warn('[adblock] engine not found at', enginePath, '- run: npm run build:engine');
     ctx.blocker = blocker;

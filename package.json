@@ -33,13 +33,10 @@
     "files": [
       "src/**/*",
       "scripts/smoke-run.js",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "build/adblock-engine.bin",
-        "to": "adblock-engine.bin"
-      }
+      "package.json",
+      "build/adblock-engine.bin",
+      "build/icon.png",
+      "build/icons/**"
     ],
     "linux": {
       "target": [
