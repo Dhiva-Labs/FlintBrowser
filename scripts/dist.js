@@ -132,6 +132,11 @@ if (editionId === 'standard') {
     '!node_modules/{ut_metadata,ut_pex,ut_hole_punch,lt_donthave}/**/*',
     '!node_modules/{k-rpc,k-rpc-socket}/**/*',
   ];
+  // No native Node module ships in the standard edition (utp-native, bufferutil and
+  // utf-8-validate are BitTorrent-only and excluded above), so skip electron-builder's
+  // @electron/rebuild pass: it would compile them with node-gyp, which needs Python
+  // and a C++ toolchain, only to throw the result away.
+  config.npmRebuild = false;
 }
 config.linux.desktop = config.linux.desktop || { entry: {} };
 config.linux.desktop.entry.Name = e.productName;
