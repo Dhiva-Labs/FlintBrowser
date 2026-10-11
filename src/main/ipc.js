@@ -4,7 +4,7 @@
 // Chrome channels are only honoured for registered chrome views; page
 // channels are only honoured for flint:// senders.
 
-const { ipcMain, app, dialog, nativeTheme } = require('electron');
+const { ipcMain, app, dialog, nativeTheme, shell } = require('electron');
 const { resolveOmniInput, SEARCH_ENGINES } = require('./omni');
 const { PROVIDERS } = require('./doh');
 
@@ -231,6 +231,13 @@ function registerIpc(ctx) {
 
   ipcMain.handle('pages:set-default', async (event) => {
     requirePages(event);
+    // A Microsoft Store (MSIX) install writes into a private registry hive, so
+    // app.setAsDefaultProtocolClient() would report success without changing
+    // anything. Send the user to Windows' own Default apps page instead.
+    if (process.windowsStore) {
+      shell.openExternal('ms-settings:defaultapps').catch(() => { });
+      return false;
+    }
     const a = app.setAsDefaultProtocolClient('http');
     const b = app.setAsDefaultProtocolClient('https');
     return a && b;
