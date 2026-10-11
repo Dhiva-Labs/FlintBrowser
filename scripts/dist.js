@@ -46,6 +46,62 @@ if (wantAppx && (editionId !== 'standard' || process.platform !== 'win32')) {
   process.exit(1);
 }
 
+// Everything the standard edition needs at runtime is a handful of packages.
+// The glob patterns below remove the BitTorrent stack by name, but webtorrent
+// pulls in ~150 transitive packages (streams, buffers, DHT, ...) that no name
+// pattern catches. So instead walk the real dependency graph: keep what the
+// packages the standard edition uses (every production dependency except
+// webtorrent) can reach, and exclude every other production package.
+function unusedDependencyExcludes() {
+  const readPkg = (dir) => {
+    try { return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')); } catch { return null; }
+  };
+  // Node resolution: nearest node_modules/<name> walking up from `from`.
+  const resolveDep = (name, from) => {
+    for (let d = from; d.startsWith(ROOT); d = path.dirname(d)) {
+      const candidate = path.join(d, 'node_modules', name);
+      if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
+    }
+    return null;
+  };
+  const closure = (names) => {
+    const seen = new Set();
+    const queue = names.map((n) => resolveDep(n, ROOT)).filter(Boolean);
+    while (queue.length) {
+      const dir = queue.pop();
+      if (seen.has(dir)) continue;
+      seen.add(dir);
+      const meta = readPkg(dir) || {};
+      for (const dep of Object.keys({ ...meta.dependencies, ...meta.optionalDependencies })) {
+        const resolved = resolveDep(dep, dir);
+        if (resolved && !seen.has(resolved)) queue.push(resolved);
+      }
+    }
+    return seen;
+  };
+
+  const all = Object.keys(pkg.dependencies || {});
+  const wanted = closure(all.filter((n) => n !== 'webtorrent'));
+  for (const n of all) {
+    if (n !== 'webtorrent' && !wanted.has(resolveDep(n, ROOT))) {
+      throw new Error(`dependency ${n} is not installed - run npm ci first`);
+    }
+  }
+  // electron-builder flattens nested copies (webtorrent/node_modules/mime ends up as
+  // node_modules/mime in the app), so exclude each unused package both where it is
+  // installed and by its bare name at the top level, unless a kept package has that name.
+  const nameOf = (dir) => path.relative(ROOT, dir).split(path.sep).join('/').split('node_modules/').pop();
+  const wantedNames = new Set([...wanted].map(nameOf));
+  const excludes = new Set();
+  for (const dir of closure(all)) {
+    if (wanted.has(dir)) continue;
+    excludes.add(`!${path.relative(ROOT, dir).split(path.sep).join('/')}/**/*`);
+    if (!wantedNames.has(nameOf(dir))) excludes.add(`!node_modules/${nameOf(dir)}/**/*`);
+  }
+  console.log(`[dist] standard edition: keeping ${wanted.size} dependency packages, excluding ${excludes.size} unused`);
+  return [...excludes];
+}
+
 // 1. Write the runtime marker that edition.js reads inside the packaged app.
 fs.writeFileSync(path.join(ROOT, 'src', 'edition-config.json'), JSON.stringify({ edition: editionId }, null, 2));
 
@@ -63,6 +119,7 @@ config.linux.synopsis = e.synopsis;
 if (editionId === 'standard') {
   config.files = [
     ...pkg.build.files,
+    ...unusedDependencyExcludes(),
     '!src/main/torrents.js',
     '!src/main/grabber.js',
     '!src/pages/torrents.html',
