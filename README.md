@@ -104,9 +104,11 @@ live on the privileged `flint://` scheme (`flint://settings`,
 ## Privacy
 
 Flint has **no server side**. Your history, bookmarks and settings stay in
-`~/.config/flint-browser`. The only network requests Flint itself makes are
-the ones you ask for (page loads, downloads, DoH lookups to the resolver you
-chose).
+Flint's user-data folder on your device. Besides the pages and downloads you
+ask for, the one connection Flint makes on its own is secure DNS: by default
+lookups go to Cloudflare's DNS-over-HTTPS resolver (you can pick another
+provider or turn it off in Settings). See [PRIVACY.md](PRIVACY.md) for the full
+policy.
 
 ## Roadmap
 
