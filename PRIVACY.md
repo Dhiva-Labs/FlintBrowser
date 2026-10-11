@@ -43,14 +43,15 @@ for other installs you can delete the user-data folder yourself.
   selected in Settings: DuckDuckGo by default, or Google, Bing or Brave
   Search. Address-bar suggestions come only from your local history and
   bookmarks; Flint sends no suggestion requests.
-- **Secure DNS (DNS-over-HTTPS)**. By default (mode "Automatic", provider
-  Cloudflare) Flint looks up website names through Cloudflare's resolver at
-  `cloudflare-dns.com`, falling back to your system's DNS if it cannot be
-  reached. Flint contacts this resolver when it starts, before you open any
-  page. Cloudflare's privacy policy applies to those lookups. In Settings you
-  can switch to Quad9 (`dns.quad9.net`), Google (`dns.google`), AdGuard
-  (`dns.adguard-dns.com`) or a resolver of your own, or turn secure DNS off.
-  With it off and no page open, Flint makes no network connections.
+- **Secure DNS (DNS-over-HTTPS)**. By default (Secure DNS set to "When
+  available", provider Cloudflare) Flint looks up website names through
+  Cloudflare's resolver at `cloudflare-dns.com`, falling back to your system's
+  DNS if it cannot be reached. Flint contacts this resolver when it starts,
+  before you open any page. Cloudflare's privacy policy applies to those
+  lookups. In Settings, under Network, you can switch to Quad9
+  (`dns.quad9.net`), Google (`dns.google`), AdGuard (`dns.adguard-dns.com`) or
+  a resolver of your own, or set Secure DNS to Off. With it off and no page
+  open, Flint makes no network connections.
 - **Website icons** are fetched from the sites you visit.
 - **Downloads** come straight from the file's server. Flint's "Turbo
   download" opens several connections to that same server and sends your
