@@ -60,8 +60,13 @@ function boot() {
     nativeTheme.themeSource = stores.settings.get().theme === 'light' ? 'light'
       : stores.settings.get().theme === 'dark' ? 'dark' : 'system';
 
-    // Chromium-like UA (sites break on the default Electron token)
-    const ua = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
+    // Chromium-like UA (sites break on the default Electron token), with the
+    // platform token Chrome itself sends so sites do not serve Linux content
+    // to Windows and macOS users.
+    const platformToken = process.platform === 'win32' ? 'Windows NT 10.0; Win64; x64'
+      : process.platform === 'darwin' ? 'Macintosh; Intel Mac OS X 10_15_7'
+        : 'X11; Linux x86_64';
+    const ua = `Mozilla/5.0 (${platformToken}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
     app.userAgentFallback = ua;
 
     doh.apply(app, stores.settings.get().doh);
