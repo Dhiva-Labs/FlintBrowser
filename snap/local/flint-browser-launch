@@ -1,0 +1,22 @@
+#!/bin/sh
+# Launcher for the Flint Browser snap (runs after the gnome extension's
+# desktop-launch command chain).
+#
+# --no-sandbox: the SUID chrome-sandbox helper cannot work in a snap, and
+# the namespace sandbox needs browser-support's allow-sandbox, which the
+# store does not grant without a manual review. The snap's own AppArmor and
+# seccomp confinement still applies. See packaging/SNAP.md.
+#
+# --profile-dir: keep the profile (history, bookmarks, settings, cookies and
+# the HTTP cache) in $SNAP_USER_COMMON, as the Chromium and Firefox snaps
+# do. The default ($SNAP_USER_DATA) is versioned: snapd copies it on every
+# refresh, so a browser cache there would be duplicated per revision. An
+# explicit --profile-dir=... on the command line still wins.
+profile="--profile-dir=$SNAP_USER_COMMON/profile"
+for arg in "$@"; do
+  case "$arg" in
+    --profile-dir=*) profile= ;;
+  esac
+done
+
+exec "$SNAP/opt/flint-browser/flint-browser" --no-sandbox ${profile:+"$profile"} "$@"

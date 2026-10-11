@@ -5,3 +5,4 @@ src/edition-config.json
 .tmp/
 smoke-out/
 packaging/ppa/build/
+*.snap

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Flint
+GenericName=Web Browser
+Comment=Fast, private web browser with built-in ad blocking
+Exec=flint-browser %U
+Icon=${SNAP}/meta/gui/icon.png
+Terminal=false
+StartupNotify=true
+StartupWMClass=flint
+Categories=Network;WebBrowser;
+Keywords=browser;web;internet;adblock;private;
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;

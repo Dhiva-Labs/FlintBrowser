@@ -1,0 +1,170 @@
+# Snap Store packaging for Flint Browser (standard edition).
+#
+# Builds the standard edition from source inside the snapcraft build
+# instance — npm ci, the adblock engine, then electron-builder's unpacked
+# `dir` output — and ships it on core24 with the `gnome` extension under
+# strict confinement. Nothing compiled on a developer machine goes in.
+#
+# Chromium's sandbox: the SUID chrome-sandbox helper cannot work inside a
+# snap, and the namespace sandbox needs `browser-support` with
+# `allow-sandbox: true`, which snapd's base declaration denies, so the
+# store holds such uploads for manual review. Flint therefore runs with
+# --no-sandbox inside the snap's own AppArmor + seccomp confinement, the
+# same trade-off the Slack and other store Electron snaps make
+# (snap/local/flint-browser-launch). See packaging/SNAP.md before changing
+# this.
+name: flint-browser
+title: Flint Browser
+base: core24
+version: '1.0.0'
+summary: Fast, private web browser with built-in ad and tracker blocking
+description: |
+  Flint is a fast, private desktop web browser by Dhiva Labs with ad and
+  tracker blocking, secure DNS, turbo downloads and reader mode built in,
+  and zero telemetry.
+
+  - Ad and tracker blocking: EasyList and EasyPrivacy applied at the
+    network level, not as an extension, with a per-site toggle and live
+    blocked counters on every tab.
+  - Secure DNS (DNS-over-HTTPS) via Cloudflare, Quad9, Google, AdGuard or
+    your own resolver.
+  - Turbo downloads: a multi-connection segmented downloader with pause
+    and resume.
+  - Reader mode, private windows, HTTPS-first browsing and session restore.
+  - Tabs, omnibox suggestions, bookmarks, history, downloads, find in page,
+    zoom and print.
+  - Zero telemetry: Flint sends nothing, anywhere. Your history, bookmarks
+    and settings stay on your machine.
+
+  Downloads are saved to your Downloads folder. To save to or open files
+  from USB drives and other media under /media or /mnt, and to let sites
+  use your microphone or camera (after you allow them in Flint), connect:
+
+    sudo snap connect flint-browser:removable-media
+    sudo snap connect flint-browser:audio-record
+    sudo snap connect flint-browser:camera
+
+  Printing to a printer set up in your system's CUPS needs:
+
+    sudo snap connect flint-browser:cups-control
+
+  (Saving a page as PDF from the print dialog works without it.) To make
+  Flint your default browser, choose it in your desktop's Default
+  Applications settings.
+
+  A Dhiva Labs project.
+
+grade: stable
+confinement: strict
+license: MIT
+icon: build/icons/256x256.png
+website: https://github.com/Dhiva-Labs/FlintBrowser
+source-code: https://github.com/Dhiva-Labs/FlintBrowser
+issues: https://github.com/Dhiva-Labs/FlintBrowser/issues
+contact: dhivakar1010@gmail.com
+
+platforms:
+  amd64:
+
+apps:
+  flint-browser:
+    # Adds --no-sandbox (see the header comment) and keeps the profile in
+    # $SNAP_USER_COMMON so it is not copied on every refresh.
+    command: bin/flint-browser-launch
+    # GTK, GLib, NSS, Wayland and X11 come from the gnome-46-2404 content
+    # snap and Mesa from mesa-2404 (gpu-2404), with the desktop-launch
+    # wrapper that also points ~/Downloads and the other XDG user dirs at
+    # the real home directory.
+    extensions:
+      - gnome
+    # snap/gui/flint-browser.desktop is installed as the launcher entry. It
+    # carries the http/https MimeTypes so Flint can be the default browser.
+    plugs:
+      # Electron/Chromium needs this for its shared memory, process and
+      # /proc access. Plain (no allow-sandbox), so it auto-connects.
+      - browser-support
+      - network
+      # WebRTC binds local UDP/TCP sockets for ICE candidates.
+      - network-bind
+      # Downloads to ~/Downloads, uploads and "open file" from home.
+      - home
+      # Not auto-connected: USB drives and other media under /media, /mnt.
+      - removable-media
+      - audio-playback
+      # Not auto-connected: microphone and camera for WebRTC sites.
+      - audio-record
+      - camera
+      # Keeps the screen awake during video playback.
+      - screen-inhibit-control
+      # Not auto-connected: printing to the system's CUPS printers (Ctrl+P).
+      # Unconnected, the print dialog still offers Print to File (PDF). The
+      # store linter rejects plugging both `cups` and `cups-control`, and
+      # `cups` only reaches the CUPS snap, which desktops rarely have.
+      - cups-control
+      - opengl
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - unity7
+      - gsettings
+
+parts:
+  flint-browser:
+    plugin: nil
+    # A clean checkout from git, not the working tree, so no host-built
+    # node_modules or dist/ can leak into the snap. The commit is the one
+    # the "Build installers" workflow built the published v1.0.0 release
+    # assets from (run 30030653165): the standard-edition .deb, AppImage and
+    # tarball on GitHub are this exact code. The v1.0.0 tag itself predates
+    # the standard/Plus split. For the next release, point this at its tag.
+    source: .
+    source-type: git
+    source-commit: eafe29fc61a71d8f4f018156c3e2252b5217cc21
+    build-snaps:
+      # electron-builder 26 / @electron/rebuild need Node >= 22.12.
+      - node/22/stable
+    build-packages:
+      # Only for @electron/rebuild's pass over the Plus-only utp-native
+      # module, which the standard edition then excludes; nothing native
+      # ships in this snap besides Electron's own prebuilt binaries.
+      - g++
+      - make
+      - python3
+    override-build: |
+      # scripts/dist.js builds .deb/.AppImage/.tar.gz; the snap only needs
+      # electron-builder's unpacked `dir` output. Fail loudly if the line
+      # this edits ever changes.
+      sed -i "s/Platform.LINUX.createTarget(\['deb', 'AppImage', 'tar.gz'\])/Platform.LINUX.createTarget(['dir'])/" scripts/dist.js
+      grep -q "Platform.LINUX.createTarget(\['dir'\])" scripts/dist.js
+
+      npm ci --no-audit --no-fund
+
+      # Same recipe as the release workflow: refresh the EasyList and
+      # EasyPrivacy engine, keeping the committed snapshot if the lists
+      # cannot be fetched.
+      npm run build:engine || echo "adblock: keeping the committed engine snapshot"
+
+      node scripts/dist.js standard
+
+      install -d "$CRAFT_PART_INSTALL/opt"
+      cp -a dist/linux-unpacked "$CRAFT_PART_INSTALL/opt/flint-browser"
+      # The SUID sandbox helper cannot work in a snap and is never used with
+      # --no-sandbox.
+      rm -f "$CRAFT_PART_INSTALL/opt/flint-browser/chrome-sandbox"
+
+  launcher:
+    plugin: dump
+    source: snap/local
+    organize:
+      flint-browser-launch: bin/flint-browser-launch
+    stage:
+      - bin/flint-browser-launch
+
+lint:
+  ignore:
+    # Electron's own Vulkan loader, which it pairs with its bundled
+    # SwiftShader ICD for the software fallback. Hardware drivers (ICDs,
+    # Mesa, EGL) still come from mesa-2404 through the gpu-2404 interface.
+    - gpu:
+        - opt/flint-browser/libvulkan.so.1
