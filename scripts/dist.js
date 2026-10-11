@@ -150,6 +150,9 @@ if (wantAppx) {
   // profile folder match what the user installed ("Flint Browser.exe").
   config.productName = 'Flint Browser';
   config.extraMetadata.productName = 'Flint Browser';
+  // electron-builder pastes the description into AppxManifest.xml without XML
+  // escaping, so the "&" in package.json's description makes the manifest invalid.
+  config.extraMetadata.description = 'Fast, private, batteries-included web browser with built-in ad and tracker blocking, secure DNS, turbo downloads and reader mode.';
   targets = Platform.WINDOWS.createTarget(['appx']);
 } else if (process.platform === 'win32') {
   targets = Platform.WINDOWS.createTarget(['nsis']);
