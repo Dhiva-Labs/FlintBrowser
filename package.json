@@ -19,8 +19,10 @@
     "test": "node --test",
     "build:engine": "node scripts/build-adblock.js",
     "build:icons": "node scripts/gen-icons.js",
+    "build:appx-assets": "node scripts/gen-appx-assets.js",
     "dist": "node scripts/dist.js standard && node scripts/dist.js plus",
     "dist:standard": "node scripts/dist.js standard",
+    "dist:appx": "node scripts/dist.js standard --appx",
     "dist:plus": "node scripts/dist.js plus"
   },
   "build": {
@@ -69,6 +71,20 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "artifactName": "${name}-${version}-${arch}.${ext}"
+    },
+    "appx": {
+      "identityName": "Dhiva-Labs.FlintBrowser",
+      "publisher": "CN=0F69015A-AA5B-431D-970A-165099309E53",
+      "publisherDisplayName": "Dhiva-Labs",
+      "applicationId": "FlintBrowser",
+      "displayName": "Flint Browser",
+      "backgroundColor": "#22252b",
+      "languages": ["en-US"],
+      "capabilities": ["internetClient"],
+      "minVersion": "10.0.17763.0",
+      "maxVersionTested": "10.0.22621.0",
+      "showNameOnTiles": true,
       "artifactName": "${name}-${version}-${arch}.${ext}"
     }
   },

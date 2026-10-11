@@ -3,6 +3,7 @@
 // Build one edition (standard or plus) from the single codebase.
 //   node scripts/dist.js standard
 //   node scripts/dist.js plus
+//   node scripts/dist.js standard --appx   (Windows only: Microsoft Store MSIX/AppX)
 //
 // Both editions share all base config in package.json > build; this script
 // overlays the per-edition identity (name / appId / product name / executable)
@@ -32,10 +33,16 @@ const EDITIONS = {
   },
 };
 
-const editionId = process.argv[2];
+const args = process.argv.slice(2);
+const editionId = args.find((a) => !a.startsWith('--'));
+const wantAppx = args.includes('--appx');
 const e = EDITIONS[editionId];
-if (!e) {
-  console.error('usage: node scripts/dist.js <standard|plus>');
+if (!e || args.some((a) => a.startsWith('--') && a !== '--appx')) {
+  console.error('usage: node scripts/dist.js <standard|plus> [--appx]');
+  process.exit(1);
+}
+if (wantAppx && (editionId !== 'standard' || process.platform !== 'win32')) {
+  console.error('--appx builds the Microsoft Store package: standard edition, on Windows only');
   process.exit(1);
 }
 
@@ -75,7 +82,14 @@ config.linux.desktop.entry.StartupWMClass = e.exe;
 
 // Build for the host OS: Linux packages on Linux, an NSIS installer on Windows.
 let targets;
-if (process.platform === 'win32') {
+if (wantAppx) {
+  // Microsoft Store package. The Store identity lives in package.json > build.appx.
+  // Name it after the Store listing so the executable, window title and
+  // profile folder match what the user installed ("Flint Browser.exe").
+  config.productName = 'Flint Browser';
+  config.extraMetadata.productName = 'Flint Browser';
+  targets = Platform.WINDOWS.createTarget(['appx']);
+} else if (process.platform === 'win32') {
   targets = Platform.WINDOWS.createTarget(['nsis']);
 } else if (process.platform === 'darwin') {
   targets = Platform.MAC.createTarget(['dmg', 'zip']);
@@ -91,7 +105,7 @@ build({
   publish: 'never', // the CI workflow uploads artifacts itself
 }).then((files) => {
   console.log('\nArtifacts:');
-  for (const f of files) if (/\.(deb|AppImage|tar\.gz)$/.test(f)) console.log('  ' + path.basename(f));
+  for (const f of files) if (/\.(deb|AppImage|tar\.gz|exe|appx)$/.test(f)) console.log('  ' + path.basename(f));
 }).catch((err) => {
   console.error(err);
   process.exit(1);
