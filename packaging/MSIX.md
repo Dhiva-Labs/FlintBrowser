@@ -19,7 +19,7 @@ Center product (Store ID 9NPK7TQQ4S5M):
 | Publisher | `CN=0F69015A-AA5B-431D-970A-165099309E53` |
 | PublisherDisplayName | `Dhiva-Labs` |
 | Application Id | `FlintBrowser` (electron-builder rejects the hyphen in the identity name here) |
-| Version | `1.0.0.0`, from `package.json` version `1.0.0` (the Store requires the 4th field to be 0) |
+| Version | `1.0.1.0`, from `package.json` version `1.0.1` (the Store requires the 4th field to be 0, and each submission must be higher than the one live: 1.0.0.0 was the first) |
 | Capabilities | `internetClient`, plus `runFullTrust` which electron-builder always adds |
 | Target | Windows.Desktop 10.0.17763.0 and later, x64 and arm64 (one package each) |
 
@@ -78,7 +78,7 @@ package for its CPU.
 Check the result with the SDK's `makeappx`:
 
 ```powershell
-makeappx unpack /o /p dist\flint-browser-1.0.0-x64.appx /d dist\appx-unpacked
+makeappx unpack /o /p dist\flint-browser-1.0.1-x64.appx /d dist\appx-unpacked
 ```
 
 Look at `AppxManifest.xml` for the identity, capabilities and `Executable`
