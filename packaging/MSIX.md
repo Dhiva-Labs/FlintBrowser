@@ -68,11 +68,12 @@ Electron both have to be arm64 builds; `process.arch` must say `arm64`).
 `ProcessorArchitecture` in the manifest follows, and so does the file name.
 The "Build installers" workflow builds both on native runners (`windows-latest`
 and `windows-11-arm`) and keeps them as the `msix-x64` and `msix-arm64`
-workflow artifacts. It checks the manifest identity and architecture, that
-every binary inside is for that CPU, and runs the app's smoke suite from the
-same unpacked files. Nothing is uploaded to Partner Center: download both
-artifacts and add both `.appx` files to the same submission, and the Store
-serves each device the package for its CPU.
+workflow artifacts. It checks the manifest identity and architecture and that
+every binary inside is for that CPU, and runs the app's smoke suite on the same
+build of the app (the unpacked files of the installer built in the same job).
+Nothing is uploaded to Partner Center: download both artifacts and add both
+`.appx` files to the same submission, and the Store serves each device the
+package for its CPU.
 
 Check the result with the SDK's `makeappx`:
 

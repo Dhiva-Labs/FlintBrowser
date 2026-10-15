@@ -9,9 +9,10 @@ name: Build installers
 #     Packages are kept as workflow artifacts; nothing is released.
 #   * a pushed v* tag, or a manual run with `release_tag`: the same, then the
 #     installers are uploaded to that GitHub release, which must already exist
-#     (it is created by hand; this workflow only attaches files to it).
+#     (it is created by hand; this workflow only attaches files to it). A file
+#     whose name is already on the release is skipped, never replaced.
 #   * a manual run can build one architecture only, e.g. `arch: arm64` to add
-#     arm64 installers to an existing release without touching its x64 ones.
+#     arm64 installers to an existing release.
 #
 # Besides the release installers it builds the standard edition as a Microsoft
 # Store MSIX (.appx) and as a snap, kept as workflow artifacts only: uploading
@@ -43,8 +44,44 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # EasyList/EasyPrivacy are fetched and compiled once, here, and every
+  # installer ships this same engine. (Fetching from each Windows job failed
+  # intermittently with an undici assertion in Node, and a release should not
+  # carry a different filter snapshot per package.)
+  engine:
+    name: Adblock engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Only the filter-list compiler is needed, not Electron's download.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build adblock engine
+        run: |
+          for attempt in 1 2 3 4 5; do
+            npm run build:engine && exit 0
+            echo "::warning::adblock engine build failed (attempt $attempt of 5)"
+            sleep $((attempt * 15))
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adblock-engine
+          path: build/adblock-engine.bin
+          if-no-files-found: error
+          retention-days: 14
+
   linux:
     name: Linux ${{ matrix.arch }} (${{ matrix.edition }})
+    needs: engine
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 60
     strategy:
@@ -72,16 +109,11 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      # Fetches EasyList/EasyPrivacy. easylist.to now and then drops the
-      # connection when many jobs ask at once, so try a few times.
-      - name: Build adblock engine
-        run: |
-          for attempt in 1 2 3 4 5; do
-            npm run build:engine && exit 0
-            echo "::warning::adblock engine build failed (attempt $attempt of 5)"
-            sleep $((attempt * 15))
-          done
-          exit 1
+      - name: Get the adblock engine
+        uses: actions/download-artifact@v4
+        with:
+          name: adblock-engine
+          path: build
 
       - name: Build icons
         run: npm run build:icons
@@ -147,6 +179,20 @@ jobs:
           xvfb-run -a --server-args='-screen 0 1280x800x24' \
             "$(command -v "$pkg")" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/flint-profile"
 
+      - name: Diagnose the smoke crash (temporary)
+        if: failure() && matrix.arch == 'arm64' && matrix.edition == 'plus'
+        shell: bash
+        run: |
+          sudo apt-get install -y gdb
+          exe="$(readlink -f "$(command -v flint-browser-plus)")"
+          echo "exe=$exe"
+          export FLINT_SMOKE_OUT="$PWD/smoke-out2"
+          for i in 1 2 3; do
+            xvfb-run -a "$exe" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/p$i" > /dev/null 2>&1 && echo "gpu-off run $i: exit 0" || echo "gpu-off run $i: exit $?"
+          done
+          xvfb-run -a "$exe" --no-sandbox --smoke --profile-dir="$RUNNER_TEMP/p4" > /dev/null 2>&1 && echo "gpu-on: exit 0" || echo "gpu-on: exit $?"
+          xvfb-run -a gdb -batch -ex 'handle SIGPIPE nostop noprint' -ex run -ex 'bt 40' -ex 'info sharedlibrary' --args "$exe" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/p5" 2>&1 | tail -120
+
       - name: Upload smoke screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -169,6 +215,7 @@ jobs:
 
   windows:
     name: Windows ${{ matrix.arch }} (${{ matrix.edition }})
+    needs: engine
     runs-on: ${{ matrix.arch == 'arm64' && 'windows-11-arm' || 'windows-latest' }}
     timeout-minutes: 60
     strategy:
@@ -198,16 +245,11 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      # Fetches EasyList/EasyPrivacy. easylist.to now and then drops the
-      # connection when many jobs ask at once, so try a few times.
-      - name: Build adblock engine
-        run: |
-          for attempt in 1 2 3 4 5; do
-            npm run build:engine && exit 0
-            echo "::warning::adblock engine build failed (attempt $attempt of 5)"
-            sleep $((attempt * 15))
-          done
-          exit 1
+      - name: Get the adblock engine
+        uses: actions/download-artifact@v4
+        with:
+          name: adblock-engine
+          path: build
 
       - name: Build icons
         run: npm run build:icons
@@ -386,10 +428,21 @@ jobs:
           merge-multiple: true
           path: release-assets
 
+      # Adds what the release lacks and leaves any file already on it alone, so
+      # a release can carry hand-made assets, and a rerun or a run for one
+      # architecture only never replaces files that are already there.
       - name: Upload installers to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
         run: |
           ls -l release-assets
-          gh release upload "$TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
+          existing=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          for file in release-assets/*; do
+            name=$(basename "$file")
+            if grep -qxF -- "$name" <<< "$existing"; then
+              echo "skipping $name: already on the release"
+            else
+              gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
