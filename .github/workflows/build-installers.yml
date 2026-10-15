@@ -72,8 +72,16 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # Fetches EasyList/EasyPrivacy. easylist.to now and then drops the
+      # connection when many jobs ask at once, so try a few times.
       - name: Build adblock engine
-        run: npm run build:engine
+        run: |
+          for attempt in 1 2 3 4 5; do
+            npm run build:engine && exit 0
+            echo "::warning::adblock engine build failed (attempt $attempt of 5)"
+            sleep $((attempt * 15))
+          done
+          exit 1
 
       - name: Build icons
         run: npm run build:icons
@@ -135,8 +143,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb "./dist/$pkg-$ver-$deb_arch.deb"
           command -v "$pkg"
+          # Xvfb has no GPU: render in software so page captures are reliable.
           xvfb-run -a --server-args='-screen 0 1280x800x24' \
-            "$(command -v "$pkg")" --no-sandbox --smoke --profile-dir="$RUNNER_TEMP/flint-profile"
+            "$(command -v "$pkg")" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/flint-profile"
 
       - name: Upload smoke screenshots
         if: always()
@@ -189,8 +198,16 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # Fetches EasyList/EasyPrivacy. easylist.to now and then drops the
+      # connection when many jobs ask at once, so try a few times.
       - name: Build adblock engine
-        run: npm run build:engine
+        run: |
+          for attempt in 1 2 3 4 5; do
+            npm run build:engine && exit 0
+            echo "::warning::adblock engine build failed (attempt $attempt of 5)"
+            sleep $((attempt * 15))
+          done
+          exit 1
 
       - name: Build icons
         run: npm run build:icons
@@ -209,6 +226,9 @@ jobs:
 
           require=
           if [ "${{ matrix.edition }}" = plus ]; then require=--require=utp-native; fi
+          # electron-builder ships the same 32-bit x86 elevation helper for
+          # every architecture (Windows on Arm runs it under emulation).
+          elevate=--allow=resources/elevate.exe
 
           # The installer only unpacks this directory, so this is what ships.
           # (electron-builder's NSIS stub is a 32-bit x86 program on every
@@ -218,7 +238,7 @@ jobs:
           test "${#unpacked[@]}" -eq 1
           exes=("${unpacked[0]}"/*.exe)
           test "${#exes[@]}" -eq 1
-          node scripts/verify-arch.js "$arch" $require "${exes[0]}" "${unpacked[0]}"
+          node scripts/verify-arch.js "$arch" $require "$elevate" "${exes[0]}" "${unpacked[0]}"
 
       - name: Run the smoke suite
         timeout-minutes: 10
@@ -265,7 +285,7 @@ jobs:
           ls -l dist/*.appx
           unpacked=(dist/win*-unpacked)
           test "${#unpacked[@]}" -eq 1
-          node scripts/verify-arch.js "$arch" "${unpacked[0]}/Flint Browser.exe" "${unpacked[0]}"
+          node scripts/verify-arch.js "$arch" --allow=resources/elevate.exe "${unpacked[0]}/Flint Browser.exe" "${unpacked[0]}"
           APPX="$appx" ARCH="$arch" pwsh -NoProfile -Command '
             $ErrorActionPreference = "Stop"
             Add-Type -AssemblyName System.IO.Compression.FileSystem
