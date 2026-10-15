@@ -187,11 +187,8 @@ jobs:
           exe="$(readlink -f "$(command -v flint-browser-plus)")"
           echo "exe=$exe"
           export FLINT_SMOKE_OUT="$PWD/smoke-out2"
-          for i in 1 2 3; do
-            xvfb-run -a "$exe" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/p$i" > /dev/null 2>&1 && echo "gpu-off run $i: exit 0" || echo "gpu-off run $i: exit $?"
-          done
-          xvfb-run -a "$exe" --no-sandbox --smoke --profile-dir="$RUNNER_TEMP/p4" > /dev/null 2>&1 && echo "gpu-on: exit 0" || echo "gpu-on: exit $?"
-          xvfb-run -a gdb -batch -ex 'handle SIGPIPE nostop noprint' -ex run -ex 'bt 40' -ex 'info sharedlibrary' --args "$exe" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/p5" 2>&1 | tail -120
+          xvfb-run -a gdb -batch -ex 'handle SIGPIPE nostop noprint' -ex run -ex 'bt 30' -ex 'info symbol $pc' -ex 'thread apply all bt 6' -ex 'info sharedlibrary' --args "$exe" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/p5" > gdb.log 2>&1 || true
+          grep -v -E '^\[New Thread|^\[Thread|^\[Detaching|^(0x[0-9a-f]+ +0x[0-9a-f]+ +Yes \(\*\) +/(lib|usr)/)' gdb.log | tail -120
 
       - name: Upload smoke screenshots
         if: always()
