@@ -2,7 +2,7 @@
 
 `snap/snapcraft.yaml` packages the **standard** Flint edition as the
 `flint-browser` snap: core24, the `gnome` extension, strict confinement,
-amd64. It passes the store's automated review (`review-tools` 0.48: pass, no
+amd64 and arm64. It passes the store's automated review (`review-tools` 0.48: pass, no
 errors, warnings or manual-review flags), so an upload can be released to a
 channel straight away.
 
@@ -27,7 +27,8 @@ instance; nothing compiled on a developer machine is shipped:
    build `sed`s that one line to electron-builder's `dir` target and
    `grep`s that the edit applied, so a change to the line fails the build
    instead of silently building the wrong thing.
-5. `dist/linux-unpacked` becomes `$SNAP/opt/flint-browser`, minus
+5. `dist/linux-unpacked` (`dist/linux-arm64-unpacked` on arm64) becomes
+   `$SNAP/opt/flint-browser`, minus
    `chrome-sandbox` (see below).
 
 The standard edition carries no native Node modules (the only one in the
@@ -64,6 +65,25 @@ lxc --project snapcraft exec "$C" -- systemctl restart snapd
 ```
 
 Stale state after editing parts: `snapcraft clean --use-lxd`.
+
+### arm64
+
+`platforms` lists `amd64` and `arm64`; each is built on a machine of its own
+architecture (`snapcraft pack --use-lxd` on an arm64 box, or `snapcraft
+remote-build`), because electron-builder packages for the CPU it runs on. That
+produces `flint-browser_1.0.0_arm64.snap`. The "Build installers" workflow
+builds both on `ubuntu-latest` and `ubuntu-24.04-arm`, checks that every
+binary in the snap is for its CPU, installs it and runs the smoke suite, and
+keeps the snap as the `snap-x64` / `snap-arm64` workflow artifact. It never
+uploads to the store.
+
+Because `source-commit` pins a commit (see above), CI builds that commit's
+code on both architectures, not the tip of the branch. The upload is per
+architecture and goes to the same channel:
+
+```bash
+snapcraft upload --release=stable flint-browser_1.0.0_arm64.snap
+```
 
 ### Checking review before uploading
 

@@ -10,6 +10,14 @@
   secure DNS, turbo downloads and reader mode built in — and zero telemetry.
 </p>
 
+<div align="center">
+
+[![ARM64 builds](https://github.com/Dhiva-Labs/FlintBrowser/actions/workflows/build-installers.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/FlintBrowser/actions/workflows/build-installers.yml)
+![Linux x64 | arm64](https://img.shields.io/badge/Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+![Windows x64 | arm64](https://img.shields.io/badge/Windows-x64%20%7C%20arm64-informational?logo=windows&logoColor=white)
+
+</div>
+
 ![Flint home page](docs/home.png)
 
 ## Two editions
@@ -60,18 +68,37 @@ sudo apt update
 sudo apt install flint-browser
 ```
 
+The PPA is built for amd64 only. On an arm64 machine use the `.deb` or
+`.AppImage` from Releases (below).
+
 ### Direct download
 
-Grab the latest `.deb`, `.AppImage` or `.tar.gz` from
+Grab the latest build for your CPU from
 [Releases](https://github.com/Dhiva-Labs/FlintBrowser/releases) — `flint-browser-*`
-for the standard edition, `flint-browser-plus-*` for Flint Plus.
+for the standard edition, `flint-browser-plus-*` for Flint Plus. Each release
+carries x64 and arm64 builds:
+
+| | x64 (Intel / AMD) | arm64 (aarch64, Windows on Arm) |
+|---|---|---|
+| Debian / Ubuntu package | `flint-browser-<version>-amd64.deb` | `flint-browser-<version>-arm64.deb` |
+| AppImage | `flint-browser-<version>-x86_64.AppImage` | `flint-browser-<version>-arm64.AppImage` |
+| Linux tarball | `flint-browser-<version>-x64.tar.gz` | `flint-browser-<version>-arm64.tar.gz` |
+| Windows installer | `flint-browser-<version>-x64.exe` | `flint-browser-<version>-arm64.exe` |
+
+Check which one you need with `uname -m` on Linux (`x86_64` is x64, `aarch64` is
+arm64) or Settings, System, About on Windows ("System type").
 
 ```bash
+# x64
 sudo apt install ./flint-browser-1.0.0-amd64.deb
+# arm64
+sudo apt install ./flint-browser-1.0.0-arm64.deb
 ```
 
 The AppImage needs no installation: `chmod +x` and run. The two editions install
-side by side (distinct app IDs and executables).
+side by side (distinct app IDs and executables). On Windows, run the installer
+for your CPU; the arm64 build runs natively on Windows on Arm and the x64 build
+also works there, through Windows' emulation, but slower.
 
 ## Build from source
 
@@ -90,7 +117,10 @@ BitTorrent transfer over a loopback tracker). `npm run smoke:standard` verifies
 the standard edition ships without the Plus features.
 
 Release artifacts: `npm run dist` builds both editions into `dist/`
-(`npm run dist:standard` / `npm run dist:plus` for one).
+(`npm run dist:standard` / `npm run dist:plus` for one). The packages are built
+for the machine you run it on, so an arm64 machine produces arm64 packages; the
+"Build installers" workflow does exactly that on native x64 and arm64 runners
+for Linux and Windows.
 
 ## Architecture
 
