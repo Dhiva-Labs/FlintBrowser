@@ -13,11 +13,15 @@ instance; nothing compiled on a developer machine is shipped:
 
 1. `source: .` with `source-type: git` clones the repository, so host
    `node_modules/` and `dist/` never reach the build.
-2. `source-commit` pins **eafe29f**, the commit the "Build installers"
-   workflow (run 30030653165) built the published v1.0.0 release assets from.
-   The `v1.0.0` tag points at the first commit, before the standard/Plus
-   split, so it is *not* what `flint-browser-1.0.0-*.deb/.AppImage/.tar.gz`
-   contain. For the next release, tag the release commit and pin that.
+2. `source-commit` pins **2c62a1e**, the commit that bumped `package.json` to
+   1.0.1, so the snap holds the same code as the 1.0.1 release installers
+   (and reports the same version). It is a hash and not the tag because the
+   tag does not exist yet when the release pull request is built; that commit
+   must stay reachable from `main`, so merge the release pull request with a
+   merge commit rather than squashing it. For the next release, point it at
+   the commit that bumps the version. (The 1.0.0 snap was built from
+   `eafe29f`, the commit the 1.0.0 release assets came from: the `v1.0.0` tag
+   points at the first commit, before the standard/Plus split.)
 3. `npm ci` (Node 22 from the `node` snap; electron-builder 26 and
    `@electron/rebuild` need Node >= 22.12), `npm run build:engine` to
    refresh EasyList/EasyPrivacy as the release workflow does (the committed
@@ -53,7 +57,7 @@ the software fallback.
 snapcraft pack --use-lxd
 ```
 
-Produces `flint-browser_1.0.0_amd64.snap` (about 110 MB) in the repository
+Produces `flint-browser_1.0.1_amd64.snap` (about 110 MB) in the repository
 root; `*.snap` is git-ignored. A clean build takes 10 to 15 minutes, most of
 it installing the gnome SDK and mesa build snaps and electron-builder
 packaging. If the build instance stalls downloading snaps, restart snapd
@@ -71,7 +75,7 @@ Stale state after editing parts: `snapcraft clean --use-lxd`.
 `platforms` lists `amd64` and `arm64`; each is built on a machine of its own
 architecture (`snapcraft pack --use-lxd` on an arm64 box, or `snapcraft
 remote-build`), because electron-builder packages for the CPU it runs on. That
-produces `flint-browser_1.0.0_arm64.snap`. The "Build installers" workflow
+produces `flint-browser_1.0.1_arm64.snap`. The "Build installers" workflow
 builds both on `ubuntu-latest` and `ubuntu-24.04-arm`, checks that every
 binary in the snap is for its CPU, installs it and runs the smoke suite, and
 keeps the snap as the `snap-x64` / `snap-arm64` workflow artifact. It never
@@ -82,7 +86,7 @@ code on both architectures, not the tip of the branch. The upload is per
 architecture and goes to the same channel:
 
 ```bash
-snapcraft upload --release=stable flint-browser_1.0.0_arm64.snap
+snapcraft upload --release=stable flint-browser_1.0.1_arm64.snap
 ```
 
 ### Checking review before uploading
@@ -95,10 +99,10 @@ because `review-tools` is strictly confined and only reads its own
 C=$(lxc --project snapcraft list -c n --format csv | grep flint-browser)
 lxc --project snapcraft start "$C"
 lxc --project snapcraft exec "$C" -- snap install review-tools
-lxc --project snapcraft file push flint-browser_1.0.0_amd64.snap \
+lxc --project snapcraft file push flint-browser_1.0.1_amd64.snap \
   "$C/var/snap/review-tools/common/"
 lxc --project snapcraft exec "$C" -- sh -c \
-  'cd /var/snap/review-tools/common && review-tools.snap-review flint-browser_1.0.0_amd64.snap'
+  'cd /var/snap/review-tools/common && review-tools.snap-review flint-browser_1.0.1_amd64.snap'
 ```
 
 This caught one real problem during packaging: plugging both `cups` and
@@ -108,7 +112,7 @@ This caught one real problem during packaging: plugging both `cups` and
 
 ```bash
 snapcraft register flint-browser     # once
-snapcraft upload --release=stable flint-browser_1.0.0_amd64.snap
+snapcraft upload --release=stable flint-browser_1.0.1_amd64.snap
 ```
 
 Do not upload a build that needs manual review (for example one with
