@@ -1,75 +1,119 @@
 name: Build installers
 
-# Builds native installers on real runners and attaches them to a release.
-# Windows .exe installers can't be produced on the Linux dev box (no Wine),
-# so they are built here on windows-latest.
+# Builds the Linux and Windows installers for x64 and arm64, each on a runner
+# of its own architecture (so native Node add-ons compile for the CPU they
+# ship for), proves every package really is that architecture, runs the unit
+# tests and the in-app smoke suite, and attaches the installers to a release.
+#
+#   * pull requests and pushes to main: build, verify and test everything.
+#     Packages are kept as workflow artifacts; nothing is released.
+#   * a pushed v* tag, or a manual run with `release_tag`: the same, then the
+#     installers are uploaded to that GitHub release, which must already exist
+#     (it is created by hand; this workflow only attaches files to it). A file
+#     whose name is already on the release is skipped, never replaced.
+#   * a manual run can build one architecture only, e.g. `arch: arm64` to add
+#     arm64 installers to an existing release.
+#
+# Besides the release installers it builds the standard edition as a Microsoft
+# Store MSIX (.appx) and as a snap, kept as workflow artifacts only: uploading
+# to Partner Center and the Snap Store is done by hand.
 
 on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release tag to upload artifacts to'
-        required: true
-        default: 'v1.0.0'
-  push:
-    tags:
-      - 'v*'
+        description: 'Release tag to upload installers to (leave empty to only build)'
+        required: false
+        default: ''
+      arch:
+        description: 'Architectures to build'
+        type: choice
+        options: [all, x64, arm64]
+        default: all
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: build-installers-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  windows:
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        edition: [standard, plus]
+  # EasyList/EasyPrivacy are fetched and compiled once, here, and every
+  # installer ships this same engine. (Fetching from each Windows job failed
+  # intermittently with an undici assertion in Node, and a release should not
+  # carry a different filter snapshot per package.)
+  engine:
+    name: Adblock engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
+      # Only the filter-list compiler is needed, not Electron's download.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build adblock engine
-        run: npm run build:engine
-
-      - name: Build icons
-        run: npm run build:icons
-
-      - name: Build ${{ matrix.edition }} installer
-        run: node scripts/dist.js ${{ matrix.edition }}
-
-      - name: Upload installer to release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
         run: |
-          gh release upload "$TAG" dist/*.exe --clobber --repo "$GITHUB_REPOSITORY"
+          for attempt in 1 2 3 4 5; do
+            npm run build:engine && exit 0
+            echo "::warning::adblock engine build failed (attempt $attempt of 5)"
+            sleep $((attempt * 15))
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adblock-engine
+          path: build/adblock-engine.bin
+          if-no-files-found: error
+          retention-days: 14
 
   linux:
-    runs-on: ubuntu-latest
+    name: Linux ${{ matrix.arch }} (${{ matrix.edition }})
+    needs: engine
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         edition: [standard, plus]
+        arch: ${{ fromJSON(inputs.arch == 'x64' && '["x64"]' || inputs.arch == 'arm64' && '["arm64"]' || '["x64","arm64"]') }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          architecture: ${{ matrix.arch }}
+
+      - name: Check the toolchain is ${{ matrix.arch }}
+        run: |
+          node -p "process.platform + '/' + process.arch + ', node ' + process.version"
+          test "$(node -p process.arch)" = "${{ matrix.arch }}"
+          uname -m
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build adblock engine
-        run: npm run build:engine
+      - name: Unit tests
+        run: npm test
+
+      - name: Get the adblock engine
+        uses: actions/download-artifact@v4
+        with:
+          name: adblock-engine
+          path: build
 
       - name: Build icons
         run: npm run build:icons
@@ -77,10 +121,314 @@ jobs:
       - name: Build ${{ matrix.edition }} packages
         run: node scripts/dist.js ${{ matrix.edition }}
 
-      - name: Upload packages to release
+      - name: Verify the packages are ${{ matrix.arch }}
         shell: bash
+        run: |
+          arch=${{ matrix.arch }}
+          case "$arch" in
+            x64)   deb_arch=amd64; appimage_arch=x86_64; file_arch='x86-64' ;;
+            arm64) deb_arch=arm64; appimage_arch=arm64;  file_arch='ARM aarch64' ;;
+          esac
+          pkg=flint-browser${{ matrix.edition == 'plus' && '-plus' || '' }}
+          ver=$(node -p "require('./package.json').version")
+          deb="dist/$pkg-$ver-$deb_arch.deb"
+          appimage="dist/$pkg-$ver-$appimage_arch.AppImage"
+          tarball="dist/$pkg-$ver-$arch.tar.gz"
+          for f in "$deb" "$appimage" "$tarball"; do
+            test -f "$f" || { echo "::error::missing $f"; ls -l dist; exit 1; }
+          done
+          ls -l dist/*.deb dist/*.AppImage dist/*.tar.gz
+
+          require=
+          if [ "${{ matrix.edition }}" = plus ]; then require=--require=utp-native; fi
+
+          # The unpacked app every package is made from.
+          unpacked=(dist/linux*-unpacked)
+          test "${#unpacked[@]}" -eq 1
+          file "${unpacked[0]}/$pkg" "$appimage"
+          file -b "${unpacked[0]}/$pkg" | grep -F "$file_arch"
+          file -b "$appimage" | grep -F "$file_arch"
+          node scripts/verify-arch.js "$arch" $require "${unpacked[0]}/$pkg" "${unpacked[0]}"
+
+          # And what is inside each package format.
+          test "$(dpkg-deb -f "$deb" Architecture)" = "$deb_arch"
+          mkdir -p .tmp/deb .tmp/tar .tmp/appimage
+          dpkg-deb -x "$deb" .tmp/deb
+          node scripts/verify-arch.js "$arch" $require .tmp/deb
+          tar -xzf "$tarball" -C .tmp/tar
+          node scripts/verify-arch.js "$arch" $require .tmp/tar
+          chmod +x "$appimage"
+          (cd .tmp/appimage && "$GITHUB_WORKSPACE/$appimage" --appimage-extract > /dev/null)
+          node scripts/verify-arch.js "$arch" $require .tmp/appimage/squashfs-root
+          rm -rf .tmp
+
+      - name: Install the .deb and run the smoke suite
+        shell: bash
+        timeout-minutes: 10
+        env:
+          FLINT_SMOKE_OUT: ${{ github.workspace }}/smoke-out
+        run: |
+          arch=${{ matrix.arch }}
+          case "$arch" in x64) deb_arch=amd64 ;; arm64) deb_arch=arm64 ;; esac
+          pkg=flint-browser${{ matrix.edition == 'plus' && '-plus' || '' }}
+          ver=$(node -p "require('./package.json').version")
+          sudo apt-get update
+          sudo apt-get install -y xvfb "./dist/$pkg-$ver-$deb_arch.deb"
+          command -v "$pkg"
+          # Xvfb has no GPU: render in software so page captures are reliable.
+          xvfb-run -a --server-args='-screen 0 1280x800x24' \
+            "$(command -v "$pkg")" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/flint-profile"
+
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-linux-${{ matrix.arch }}-${{ matrix.edition }}
+          path: smoke-out/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-${{ matrix.arch }}-${{ matrix.edition }}
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows ${{ matrix.arch }} (${{ matrix.edition }})
+    needs: engine
+    runs-on: ${{ matrix.arch == 'arm64' && 'windows-11-arm' || 'windows-latest' }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [standard, plus]
+        arch: ${{ fromJSON(inputs.arch == 'x64' && '["x64"]' || inputs.arch == 'arm64' && '["arm64"]' || '["x64","arm64"]') }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          architecture: ${{ matrix.arch }}
+
+      - name: Check the toolchain is ${{ matrix.arch }}
+        run: |
+          node -p "process.platform + '/' + process.arch + ', node ' + process.version"
+          test "$(node -p process.arch)" = "${{ matrix.arch }}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Get the adblock engine
+        uses: actions/download-artifact@v4
+        with:
+          name: adblock-engine
+          path: build
+
+      - name: Build icons
+        run: npm run build:icons
+
+      - name: Build ${{ matrix.edition }} installer
+        run: node scripts/dist.js ${{ matrix.edition }}
+
+      - name: Verify the installer and app are ${{ matrix.arch }}
+        run: |
+          arch=${{ matrix.arch }}
+          pkg=flint-browser${{ matrix.edition == 'plus' && '-plus' || '' }}
+          ver=$(node -p "require('./package.json').version")
+          installer="dist/$pkg-$ver-$arch.exe"
+          test -f "$installer" || { echo "::error::missing $installer"; ls -l dist; exit 1; }
+          ls -l dist/*.exe
+
+          require=
+          if [ "${{ matrix.edition }}" = plus ]; then require=--require=utp-native; fi
+          # electron-builder ships the same 32-bit x86 elevation helper for
+          # every architecture (Windows on Arm runs it under emulation).
+          elevate=--allow=resources/elevate.exe
+
+          # The installer only unpacks this directory, so this is what ships.
+          # (electron-builder's NSIS stub is a 32-bit x86 program on every
+          # architecture, which Windows on Arm runs under emulation, so only
+          # the application inside it is checked.)
+          unpacked=(dist/win*-unpacked)
+          test "${#unpacked[@]}" -eq 1
+          exes=("${unpacked[0]}"/*.exe)
+          test "${#exes[@]}" -eq 1
+          node scripts/verify-arch.js "$arch" $require "$elevate" "${exes[0]}" "${unpacked[0]}"
+
+      - name: Run the smoke suite
+        timeout-minutes: 10
+        env:
+          FLINT_SMOKE_OUT: ${{ github.workspace }}\smoke-out
+        run: |
+          unpacked=(dist/win*-unpacked)
+          exes=("${unpacked[0]}"/*.exe)
+          "${exes[0]}" --smoke "--profile-dir=${{ runner.temp }}\flint-profile"
+
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-windows-${{ matrix.arch }}-${{ matrix.edition }}
+          path: smoke-out/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-${{ matrix.arch }}-${{ matrix.edition }}
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      # Microsoft Store package: the standard edition only, unsigned (the Store
+      # signs it). Built from a clean unpacked directory, as it renames the
+      # executable to "Flint Browser.exe".
+      - name: Build Microsoft Store package (MSIX)
+        if: matrix.edition == 'standard'
+        run: |
+          rm -rf dist/win*-unpacked
+          node scripts/dist.js standard --appx
+
+      - name: Verify the Microsoft Store package is ${{ matrix.arch }}
+        if: matrix.edition == 'standard'
+        run: |
+          arch=${{ matrix.arch }}
+          ver=$(node -p "require('./package.json').version")
+          appx="dist/flint-browser-$ver-$arch.appx"
+          test -f "$appx" || { echo "::error::missing $appx"; ls -l dist; exit 1; }
+          ls -l dist/*.appx
+          unpacked=(dist/win*-unpacked)
+          test "${#unpacked[@]}" -eq 1
+          node scripts/verify-arch.js "$arch" --allow=resources/elevate.exe "${unpacked[0]}/Flint Browser.exe" "${unpacked[0]}"
+          APPX="$appx" ARCH="$arch" pwsh -NoProfile -Command '
+            $ErrorActionPreference = "Stop"
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $env:APPX).Path)
+            try {
+              $reader = New-Object IO.StreamReader($zip.GetEntry("AppxManifest.xml").Open())
+              $manifest = [xml]$reader.ReadToEnd()
+            } finally { $zip.Dispose() }
+            $id = $manifest.Package.Identity
+            $exe = $manifest.Package.Applications.Application.Executable
+            "Identity: $($id.Name) $($id.Version) $($id.ProcessorArchitecture), executable $exe"
+            if ($id.Name -ne "Dhiva-Labs.FlintBrowser") { throw "unexpected identity name $($id.Name)" }
+            if ($id.ProcessorArchitecture -ne $env:ARCH) { throw "manifest says $($id.ProcessorArchitecture), expected $env:ARCH" }
+          '
+
+      - name: Upload Microsoft Store package
+        if: matrix.edition == 'standard'
+        uses: actions/upload-artifact@v4
+        with:
+          name: msix-${{ matrix.arch }}
+          path: dist/*.appx
+          if-no-files-found: error
+          retention-days: 14
+
+  snap:
+    name: Snap ${{ matrix.arch }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(inputs.arch == 'x64' && '["x64"]' || inputs.arch == 'arm64' && '["arm64"]' || '["x64","arm64"]') }}
+    steps:
+      # The snap builds the commit pinned as source-commit in
+      # snap/snapcraft.yaml, so the whole history has to be present.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          architecture: ${{ matrix.arch }}
+
+      - uses: snapcore/action-build@v1
+        id: build
+        with:
+          snapcraft-args: --platform ${{ matrix.arch == 'arm64' && 'arm64' || 'amd64' }}
+
+      - name: Verify the snap is ${{ matrix.arch }}
+        run: |
+          arch=${{ matrix.arch }}
+          snap_arch=${{ matrix.arch == 'arm64' && 'arm64' || 'amd64' }}
+          snap="${{ steps.build.outputs.snap }}"
+          case "$snap" in
+            flint-browser_*_"$snap_arch".snap) ;;
+            *) echo "::error::unexpected snap name $snap"; exit 1 ;;
+          esac
+          sudo unsquashfs -d "$RUNNER_TEMP/snapfs" "$snap" > /dev/null
+          grep -A1 '^architectures:' "$RUNNER_TEMP/snapfs/meta/snap.yaml"
+          grep -A1 '^architectures:' "$RUNNER_TEMP/snapfs/meta/snap.yaml" | grep -q -- "- $snap_arch"
+          node scripts/verify-arch.js "$arch" "$RUNNER_TEMP/snapfs/opt/flint-browser/flint-browser" "$RUNNER_TEMP/snapfs/opt"
+
+      - name: Install the snap and run the smoke suite
+        timeout-minutes: 15
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          sudo snap install --dangerous "${{ steps.build.outputs.snap }}"
+          # No X authority file: a confined snap cannot read xvfb-run's.
+          Xvfb :99 -screen 0 1280x800x24 -ac &
+          export DISPLAY=:99
+          snap run flint-browser --smoke --profile-dir="$HOME/snap/flint-browser/common/smoke-profile"
+
+      - name: Upload snap
+        uses: actions/upload-artifact@v4
+        with:
+          name: snap-${{ matrix.arch }}
+          path: ${{ steps.build.outputs.snap }}
+          if-no-files-found: error
+          retention-days: 14
+
+  # The only job that can write to the repository: it attaches the installers
+  # the jobs above built to the release.
+  release:
+    name: Upload installers to the release
+    needs: [linux, windows]
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+
+      # Adds what the release lacks and leaves any file already on it alone, so
+      # a release can carry hand-made assets, and a rerun or a run for one
+      # architecture only never replaces files that are already there.
+      - name: Upload installers to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
         run: |
-          gh release upload "$TAG" dist/*.deb dist/*.AppImage "dist/"*.tar.gz --clobber --repo "$GITHUB_REPOSITORY"
+          ls -l release-assets
+          existing=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          for file in release-assets/*; do
+            name=$(basename "$file")
+            if grep -qxF -- "$name" <<< "$existing"; then
+              echo "skipping $name: already on the release"
+            else
+              gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY"
+            fi
+          done

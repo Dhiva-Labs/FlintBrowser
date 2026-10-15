@@ -1,8 +1,9 @@
 # Microsoft Store packaging for Flint Browser
 
 `node scripts/dist.js standard --appx` builds the **standard** edition as an
-unsigned MSIX/AppX package (`dist/flint-browser-<version>-x64.appx`) for upload
-to Partner Center. It only runs on Windows (electron-builder drives
+unsigned MSIX/AppX package (`dist/flint-browser-<version>-<arch>.appx`, with
+`<arch>` the CPU of the machine that runs it: `x64` or `arm64`) for upload to
+Partner Center. It only runs on Windows (electron-builder drives
 `makeappx`/`makepri` from its own Windows Kits bundle) and refuses the Plus
 edition. Microsoft signs the package when it publishes it, so no certificate is
 needed.
@@ -20,7 +21,7 @@ Center product (Store ID 9NPK7TQQ4S5M):
 | Application Id | `FlintBrowser` (electron-builder rejects the hyphen in the identity name here) |
 | Version | `1.0.0.0`, from `package.json` version `1.0.0` (the Store requires the 4th field to be 0) |
 | Capabilities | `internetClient`, plus `runFullTrust` which electron-builder always adds |
-| Target | Windows.Desktop 10.0.17763.0 and later, x64 only |
+| Target | Windows.Desktop 10.0.17763.0 and later, x64 and arm64 (one package each) |
 
 For the appx build `dist.js` also sets the product name to `Flint Browser` (so
 the executable is `Flint Browser.exe`, matching the Store name) and replaces
@@ -58,6 +59,21 @@ Developer Mode is needed: the standard edition ships no native modules, so
 `dist.js` turns off the `@electron/rebuild` pass for it. A build takes about a
 minute. `npm run build:engine` (refreshing EasyList/EasyPrivacy) is optional;
 the committed `build/adblock-engine.bin` is used as is.
+
+### x64 and arm64
+
+electron-builder packages for the CPU it runs on, so the x64 package is built
+on an x64 machine and the arm64 package on a Windows on Arm machine (Node and
+Electron both have to be arm64 builds; `process.arch` must say `arm64`).
+`ProcessorArchitecture` in the manifest follows, and so does the file name.
+The "Build installers" workflow builds both on native runners (`windows-latest`
+and `windows-11-arm`) and keeps them as the `msix-x64` and `msix-arm64`
+workflow artifacts. It checks the manifest identity and architecture and that
+every binary inside is for that CPU, and runs the app's smoke suite on the same
+build of the app (the unpacked files of the installer built in the same job).
+Nothing is uploaded to Partner Center: download both artifacts and add both
+`.appx` files to the same submission, and the Store serves each device the
+package for its CPU.
 
 Check the result with the SDK's `makeappx`:
 
@@ -107,4 +123,6 @@ or the listing can be pulled.
 * **Install test.** The package was verified by unpacking it and running the
   same files from `win-unpacked`; it was not installed through the Store or
   with `Add-AppxPackage`, because that needs sideloading enabled.
-* **arm64.** Only x64 is built.
+* **Store install test of the arm64 package.** CI builds and checks it as
+  described above, but, like the x64 one, it was not installed through the
+  Store or with `Add-AppxPackage`.

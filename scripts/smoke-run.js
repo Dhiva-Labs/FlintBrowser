@@ -234,6 +234,13 @@ module.exports = async function smoke(ctx) {
       await settle(500);
       await shot('content-torrents.png', tt.wc);
     });
+
+    // Close the app's own torrent client (and its uTP socket) before the process
+    // exits. Left open, app.exit() ended in a segfault on Windows (x64, arm64)
+    // and Linux arm64 even though every test above had passed.
+    await t('torrent client shuts down', async () => {
+      if (ctx.torrents.client) await new Promise((r) => ctx.torrents.destroy(r));
+    });
   } else {
     await t('standard edition has no torrent engine', async () => {
       if (ctx.torrents) throw new Error('torrents should not exist in standard edition');

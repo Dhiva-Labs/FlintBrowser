@@ -65,6 +65,7 @@ contact: dhivakar1010@gmail.com
 
 platforms:
   amd64:
+  arm64:
 
 apps:
   flint-browser:
@@ -147,8 +148,17 @@ parts:
 
       node scripts/dist.js standard
 
+      # electron-builder names the unpacked directory after the build
+      # architecture: dist/linux-unpacked on amd64, dist/linux-arm64-unpacked
+      # on arm64. The build runs natively, so there is exactly one.
+      unpacked=(dist/linux*-unpacked)
+      if [ "${#unpacked[@]}" -ne 1 ] || [ ! -d "${unpacked[0]}" ]; then
+        echo "expected exactly one dist/linux*-unpacked directory, got: ${unpacked[*]}" >&2
+        exit 1
+      fi
+
       install -d "$CRAFT_PART_INSTALL/opt"
-      cp -a dist/linux-unpacked "$CRAFT_PART_INSTALL/opt/flint-browser"
+      cp -a "${unpacked[0]}" "$CRAFT_PART_INSTALL/opt/flint-browser"
       # The SUID sandbox helper cannot work in a snap and is never used with
       # --no-sandbox.
       rm -f "$CRAFT_PART_INSTALL/opt/flint-browser/chrome-sandbox"
