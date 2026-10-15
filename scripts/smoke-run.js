@@ -236,7 +236,8 @@ module.exports = async function smoke(ctx) {
     });
 
     // Close the app's own torrent client (and its uTP socket) before the process
-    // exits: exiting with it open segfaults on Windows and Linux.
+    // exits. Left open, app.exit() ended in a segfault on Windows (x64, arm64)
+    // and Linux arm64 even though every test above had passed.
     await t('torrent client shuts down', async () => {
       if (ctx.torrents.client) await new Promise((r) => ctx.torrents.destroy(r));
     });

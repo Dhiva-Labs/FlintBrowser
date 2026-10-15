@@ -179,17 +179,6 @@ jobs:
           xvfb-run -a --server-args='-screen 0 1280x800x24' \
             "$(command -v "$pkg")" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/flint-profile"
 
-      - name: Diagnose the smoke crash (temporary)
-        if: failure() && matrix.arch == 'arm64' && matrix.edition == 'plus'
-        shell: bash
-        run: |
-          sudo apt-get install -y gdb
-          exe="$(readlink -f "$(command -v flint-browser-plus)")"
-          echo "exe=$exe"
-          export FLINT_SMOKE_OUT="$PWD/smoke-out2"
-          xvfb-run -a gdb -batch -ex 'handle SIGPIPE nostop noprint' -ex run -ex 'bt 30' -ex 'info symbol $pc' -ex 'thread apply all bt 6' -ex 'info sharedlibrary' --args "$exe" --no-sandbox --disable-gpu --smoke --profile-dir="$RUNNER_TEMP/p5" > gdb.log 2>&1 || true
-          grep -v -E '^\[New Thread|^\[Thread|^\[Detaching|^(0x[0-9a-f]+ +0x[0-9a-f]+ +Yes \(\*\) +/(lib|usr)/)' gdb.log | tail -120
-
       - name: Upload smoke screenshots
         if: always()
         uses: actions/upload-artifact@v4
