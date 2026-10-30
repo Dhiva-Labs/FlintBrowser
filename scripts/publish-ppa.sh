@@ -14,7 +14,9 @@ set -euo pipefail
 # there and Launchpad silently rejects uploads signed with it.
 KEY="0D3EFC9C8CE20ADE3CE809AD3D8D857AAF4D50E6"
 PPA="ppa:dhiva-labs/apps"
-BUILD="$(cd "$(dirname "$0")/.." && pwd)/packaging/ppa/build"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BUILD="$ROOT/packaging/ppa/build"
+VER="$(node -p "require('$ROOT/package.json').version")"
 
 editions=("${@:-standard plus}")
 # shellcheck disable=SC2206
@@ -22,7 +24,7 @@ editions=(${editions[@]})
 
 publish() {
   local pkg="$1"
-  local changes="$BUILD/${pkg}_1.0.0_source.changes"
+  local changes="$BUILD/${pkg}_${VER}_source.changes"
   if [ ! -f "$changes" ]; then
     echo "skip: $pkg  (no source package — run scripts/build-ppa.sh ${pkg#flint-browser-} first)"
     return

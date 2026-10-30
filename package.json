@@ -1,7 +1,7 @@
 {
   "name": "flint-browser",
   "productName": "Flint Browser",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Fast, private, batteries-included web browser by Dhiva Labs — built-in ad & tracker blocking, secure DNS, turbo downloads and reader mode.",
   "main": "src/main/main.js",
   "author": "Dhiva Labs <dhivakar1010@gmail.com>",

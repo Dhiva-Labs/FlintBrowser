@@ -90,9 +90,9 @@ arm64) or Settings, System, About on Windows ("System type").
 
 ```bash
 # x64
-sudo apt install ./flint-browser-1.0.0-amd64.deb
+sudo apt install ./flint-browser-1.0.1-amd64.deb
 # arm64
-sudo apt install ./flint-browser-1.0.0-arm64.deb
+sudo apt install ./flint-browser-1.0.1-arm64.deb
 ```
 
 The AppImage needs no installation: `chmod +x` and run. The two editions install
