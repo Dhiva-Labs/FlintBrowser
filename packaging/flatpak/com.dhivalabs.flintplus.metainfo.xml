@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.dhivalabs.flintplus</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Flint Plus</name>
+  <summary>Fast, private web browser with adblock, BitTorrent and media tools</summary>
+  <description>
+    <p>
+      Flint is a fast, private desktop web browser by Dhiva Labs with ad and
+      tracker blocking, secure DNS, turbo downloads and reader mode built in,
+      and zero telemetry.
+    </p>
+    <p>
+      Flint Plus adds a BitTorrent client and a media grabber to everything
+      the standard edition has.
+    </p>
+    <ul>
+      <li>Ad and tracker blocking with EasyList and EasyPrivacy, applied at the network level</li>
+      <li>Secure DNS (DNS-over-HTTPS) with a choice of resolvers</li>
+      <li>Turbo downloads: a multi-connection downloader with pause and resume</li>
+      <li>Reader mode, private windows, HTTPS-first browsing and session restore</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">com.dhivalabs.flintplus.desktop</launchable>
+  <categories>
+    <category>Network</category>
+    <category>WebBrowser</category>
+  </categories>
+  <url type="homepage">https://github.com/Dhiva-Labs/FlintBrowser</url>
+  <url type="bugtracker">https://github.com/Dhiva-Labs/FlintBrowser/issues</url>
+  <developer id="com.dhivalabs">
+    <name>Dhiva Labs</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <!-- The newest release must match package.json's version; CI checks it. -->
+  <releases>
+    <release version="1.0.1" date="2026-10-16"/>
+    <release version="1.0.0" date="2026-07-23"/>
+  </releases>
+</component>

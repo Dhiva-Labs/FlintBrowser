@@ -1,0 +1,60 @@
+# Flatpak manifest for Flint Plus (the plus edition).
+#
+# Like the .rpm and Arch package, this repackages the installed tree of the
+# .deb that build-installers.yml builds (unpacked by
+# packaging/linux-distros/deb-tree.sh into packaging/flatpak/tree/), so the
+# Flatpak ships the same Electron build as every other format instead of a
+# second build inside the sandbox. A Flathub submission needs `tree` swapped
+# for a source build; see README.md in this directory.
+id: com.dhivalabs.flintplus
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+# Electron's runtime libraries (NSS, libsecret, libnotify, ...) and
+# zypak, which runs Chromium's sandbox inside the Flatpak sandbox.
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: flint-browser-plus
+separate-locales: false
+finish-args:
+  # Wayland where there is one (Electron picks it with the platform hint
+  # below), X11 otherwise.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --env=ELECTRON_OZONE_PLATFORM_HINT=auto
+  - --share=ipc
+  - --device=dri
+  # A web browser: network, sound (pages and media), and downloads saved to
+  # the Downloads folder; other files go through the file chooser portal.
+  - --share=network
+  - --socket=pulseaudio
+  - --filesystem=xdg-download
+  # Desktop notifications from sites.
+  - --talk-name=org.freedesktop.Notifications
+modules:
+  - name: flint-browser-plus
+    buildsystem: simple
+    sources:
+      - type: dir
+        path: tree
+        dest: tree
+      - type: file
+        path: com.dhivalabs.flintplus.metainfo.xml
+    build-commands:
+      - cp -a "tree/opt/Flint Plus" /app/flint
+      - install -d /app/bin
+      - printf '#!/bin/sh\nexec zypak-wrapper /app/flint/flint-browser-plus "$@"\n' > /app/bin/flint-browser-plus
+      - chmod 0755 /app/bin/flint-browser-plus
+      # Not used inside the Flatpak (zypak replaces it), and a setuid file
+      # cannot be exported.
+      - rm /app/flint/chrome-sandbox
+      - install -Dm644 tree/usr/share/applications/flint-browser-plus.desktop /app/share/applications/com.dhivalabs.flintplus.desktop
+      - desktop-file-edit --set-icon=com.dhivalabs.flintplus --set-key=Exec --set-value='flint-browser-plus %U' /app/share/applications/com.dhivalabs.flintplus.desktop
+      - |
+        for dir in tree/usr/share/icons/hicolor/*/apps; do
+          size="$(basename "$(dirname "$dir")")"
+          # Flatpak exports icons up to 512x512.
+          case "$size" in 1024x1024) continue ;; esac
+          install -Dm644 "$dir/flint-browser-plus.png" "/app/share/icons/hicolor/$size/apps/com.dhivalabs.flintplus.png"
+        done
+      - install -Dm644 com.dhivalabs.flintplus.metainfo.xml /app/share/metainfo/com.dhivalabs.flintplus.metainfo.xml

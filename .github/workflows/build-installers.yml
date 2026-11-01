@@ -17,10 +17,15 @@ name: Build installers
 # Besides the release installers it builds the standard edition as a Microsoft
 # Store MSIX (.appx) and as a snap, kept as workflow artifacts only: uploading
 # to Partner Center and the Snap Store is done by hand.
+#
+# For other Linux distributions, each edition's .deb is repackaged as an .rpm
+# (Fedora, RHEL, openSUSE), an Arch package, an AUR recipe and a Flatpak
+# bundle; each is installed and run on its distribution, and they are
+# attached to releases with the installers.
 
 on:
   push:
-    branches: [main]
+    branches: [main, linux-distros]
     tags:
       - 'v*'
   pull_request:
@@ -198,6 +203,208 @@ jobs:
             dist/*.tar.gz
           if-no-files-found: error
           retention-days: 14
+
+  # Packages for distributions beyond Debian/Ubuntu, made from each edition's
+  # .deb above: .rpm (Fedora, RHEL, openSUSE) and .pkg.tar.zst (Arch). Each
+  # is installed on its real distribution and runs the in-app smoke suite
+  # there (packaging/linux-distros/). The AppImage stays electron-builder's.
+  distros:
+    name: Other distros ${{ matrix.arch }} (${{ matrix.edition }})
+    needs: linux
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [standard, plus]
+        arch: ${{ fromJSON(inputs.arch == 'x64' && '["x64"]' || inputs.arch == 'arm64' && '["arm64"]' || '["x64","arm64"]') }}
+    env:
+      NFPM_VERSION: '2.48.0'
+      EDITION: ${{ matrix.edition }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-linux-${{ matrix.arch }}-${{ matrix.edition }}
+          path: pkgs
+
+      - name: Install nfpm
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$(uname -m)" in
+            x86_64) nfpm_arch=x86_64 ;;
+            aarch64) nfpm_arch=arm64 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP/bin"
+          tarball="nfpm_${NFPM_VERSION}_Linux_${nfpm_arch}.tar.gz"
+          gh release download "v$NFPM_VERSION" -R goreleaser/nfpm -p "$tarball" -p checksums.txt
+          grep " $tarball\$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" nfpm
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Build .rpm and Arch package
+        run: |
+          case "${{ matrix.arch }}" in x64) deb_arch=amd64 ;; arm64) deb_arch=arm64 ;; esac
+          echo "DEB_ARCH=$deb_arch" >> "$GITHUB_ENV"
+          . packaging/linux-distros/distro.conf
+          ver=$(node -p "require('./package.json').version")
+          packaging/linux-distros/deb-tree.sh "pkgs/$NAME-$ver-$deb_arch.deb" "$RUNNER_TEMP/root"
+          VERSION="$ver" packaging/linux-distros/pack.sh "$RUNNER_TEMP/root" "$deb_arch" dist
+          # The Flatpak job builds from the same tree; tar keeps modes and symlinks.
+          XZ_OPT='-T0 -3' tar -C "$RUNNER_TEMP/root" -cJf "$RUNNER_TEMP/tree.tar.xz" .
+
+      - name: Install and run on Fedora, openSUSE and Arch
+        timeout-minutes: 25
+        run: packaging/linux-distros/verify.sh dist "$DEB_ARCH"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-distros-${{ matrix.arch }}-${{ matrix.edition }}
+          path: |
+            dist/*.rpm
+            dist/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tree-${{ matrix.arch }}-${{ matrix.edition }}
+          path: ${{ runner.temp }}/tree.tar.xz
+          if-no-files-found: error
+          retention-days: 3
+
+  # AUR recipes: PKGBUILD + .SRCINFO for flint-browser-bin and
+  # flint-browser-plus-bin, rendered with the checksums of this run's .debs
+  # and proven with makepkg on archlinux:latest. They need both
+  # architectures' .debs, so a run for one architecture skips them.
+  aur:
+    name: AUR PKGBUILD (${{ matrix.edition }})
+    needs: linux
+    if: inputs.arch == '' || inputs.arch == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [standard, plus]
+    env:
+      EDITION: ${{ matrix.edition }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-linux-*-${{ matrix.edition }}
+          merge-multiple: true
+          path: pkgs
+
+      - name: Render and check the PKGBUILD
+        run: |
+          . packaging/linux-distros/distro.conf
+          ver=$(node -p "require('./package.json').version")
+          VERSION="$ver" packaging/arch/aur.sh "pkgs/$NAME-$ver-amd64.deb" "pkgs/$NAME-$ver-arm64.deb" dist
+
+      - name: Upload the AUR recipe
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aur-${{ matrix.edition }}
+          path: dist/*-aur.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  # Flatpak bundles from the same trees, built with flatpak-builder in the
+  # Flathub CI image (org.freedesktop.Platform 25.08 + Electron2.BaseApp).
+  flatpak:
+    name: Flatpak ${{ matrix.arch }} (${{ matrix.edition }})
+    needs: distros
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [standard, plus]
+        arch: ${{ fromJSON(inputs.arch == 'x64' && '["x64"]' || inputs.arch == 'arm64' && '["arm64"]' || '["x64","arm64"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tree-${{ matrix.arch }}-${{ matrix.edition }}
+          path: ${{ runner.temp }}
+
+      - name: Unpack the installed tree
+        id: v
+        run: |
+          mkdir -p packaging/flatpak/tree
+          tar -xJf "$RUNNER_TEMP/tree.tar.xz" -C packaging/flatpak/tree
+          case "${{ matrix.edition }}" in
+            standard) name=flint-browser; app_id=com.dhivalabs.flint ;;
+            plus) name=flint-browser-plus; app_id=com.dhivalabs.flintplus ;;
+          esac
+          case "${{ matrix.arch }}" in x64) fp_arch=x86_64 ;; arm64) fp_arch=aarch64 ;; esac
+          ver=$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')
+          newest=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' "packaging/flatpak/$app_id.metainfo.xml" | head -n 1)
+          if [ "$newest" != "$ver" ]; then
+            echo "::error::packaging/flatpak/$app_id.metainfo.xml: newest release $newest, package.json says $ver"
+            exit 1
+          fi
+          {
+            echo "name=$name"
+            echo "app_id=$app_id"
+            echo "fp_arch=$fp_arch"
+            echo "version=$ver"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: packaging/flatpak/${{ steps.v.outputs.app_id }}.yml
+          bundle: ${{ steps.v.outputs.name }}-${{ steps.v.outputs.version }}-${{ steps.v.outputs.fp_arch }}.flatpak
+          artifact-name: release-flatpak-${{ matrix.arch }}-${{ matrix.edition }}
+          arch: ${{ steps.v.outputs.fp_arch }}
+          cache: false
+
+  # Installs each bundle on a plain Ubuntu runner the way a user would (the
+  # runtime and base app come from Flathub) and runs it in the sandbox.
+  flatpak-test:
+    name: Flatpak ${{ matrix.arch }} (${{ matrix.edition }}) install and run
+    needs: flatpak
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [standard, plus]
+        arch: ${{ fromJSON(inputs.arch == 'x64' && '["x64"]' || inputs.arch == 'arm64' && '["arm64"]' || '["x64","arm64"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-flatpak-${{ matrix.arch }}-${{ matrix.edition }}
+          path: bundle
+
+      - name: Install Flatpak and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak xvfb xauth dbus
+          # bubblewrap needs unprivileged user namespaces, which Ubuntu 24.04
+          # restricts through AppArmor.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install the bundle and run it
+        timeout-minutes: 20
+        run: |
+          case "${{ matrix.edition }}" in
+            standard) packaging/flatpak/test-bundle.sh bundle/*.flatpak com.dhivalabs.flint flint-browser ;;
+            plus) packaging/flatpak/test-bundle.sh bundle/*.flatpak com.dhivalabs.flintplus flint-browser-plus ;;
+          esac
 
   windows:
     name: Windows ${{ matrix.arch }} (${{ matrix.edition }})
@@ -400,10 +607,13 @@ jobs:
   # the jobs above built to the release.
   release:
     name: Upload installers to the release
-    needs: [linux, windows]
+    # aur is skipped on a run for one architecture; anything that failed
+    # still stops the upload.
+    needs: [linux, windows, distros, aur, flatpak-test]
     if: >-
+      !cancelled() && !failure() && (
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
-      (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+      (github.event_name == 'workflow_dispatch' && inputs.release_tag != ''))
     runs-on: ubuntu-latest
     permissions:
       contents: write
