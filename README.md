@@ -15,6 +15,7 @@
 [![ARM64 builds](https://github.com/Dhiva-Labs/FlintBrowser/actions/workflows/build-installers.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/FlintBrowser/actions/workflows/build-installers.yml)
 ![Linux x64 | arm64](https://img.shields.io/badge/Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
 ![Windows x64 | arm64](https://img.shields.io/badge/Windows-x64%20%7C%20arm64-informational?logo=windows&logoColor=white)
+![Linux: deb | rpm | Arch | AppImage | Flatpak | Snap](https://img.shields.io/badge/Linux-deb%20%7C%20rpm%20%7C%20Arch%20%7C%20AppImage%20%7C%20Flatpak%20%7C%20Snap-informational?logo=linux&logoColor=white)
 
 </div>
 
@@ -83,6 +84,9 @@ carries x64 and arm64 builds:
 | Debian / Ubuntu package | `flint-browser-<version>-amd64.deb` | `flint-browser-<version>-arm64.deb` |
 | AppImage | `flint-browser-<version>-x86_64.AppImage` | `flint-browser-<version>-arm64.AppImage` |
 | Linux tarball | `flint-browser-<version>-x64.tar.gz` | `flint-browser-<version>-arm64.tar.gz` |
+| Fedora / RHEL / openSUSE package | `flint-browser-<version>-1.x86_64.rpm` | `flint-browser-<version>-1.aarch64.rpm` |
+| Arch package | `flint-browser-<version>-1-x86_64.pkg.tar.zst` | `flint-browser-<version>-1-aarch64.pkg.tar.zst` |
+| Flatpak bundle | `flint-browser-<version>-x86_64.flatpak` | `flint-browser-<version>-aarch64.flatpak` |
 | Windows installer | `flint-browser-<version>-x64.exe` | `flint-browser-<version>-arm64.exe` |
 
 Check which one you need with `uname -m` on Linux (`x86_64` is x64, `aarch64` is
@@ -96,7 +100,30 @@ sudo apt install ./flint-browser-1.0.1-arm64.deb
 ```
 
 The AppImage needs no installation: `chmod +x` and run. The two editions install
-side by side (distinct app IDs and executables). On Windows, run the installer
+side by side (distinct app IDs and executables).
+
+### Fedora, openSUSE, Arch and Flatpak
+
+The `.rpm`, Arch package and Flatpak bundle carry the same Electron build as
+the `.deb` (repackaged from it), and CI installs and runs each one on its
+distribution. They are attached to releases from the next release on.
+
+```bash
+# Fedora, RHEL/Rocky/Alma 10
+sudo dnf install ./flint-browser-<version>-1.x86_64.rpm
+# openSUSE Tumbleweed (the .rpm is unsigned)
+sudo zypper install --allow-unsigned-rpm ./flint-browser-<version>-1.x86_64.rpm
+# Arch Linux, Manjaro, EndeavourOS (or the AUR flint-browser-bin, once published)
+sudo pacman -U ./flint-browser-<version>-1-x86_64.pkg.tar.zst
+# Any distribution with Flatpak (the runtime comes from Flathub)
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user ./flint-browser-<version>-x86_64.flatpak
+flatpak run com.dhivalabs.flint
+```
+
+Use the `aarch64` files on arm64, and `flint-browser-plus-*` (Flatpak app id
+`com.dhivalabs.flintplus`) for Flint Plus. The Flatpak saves downloads to
+your Downloads folder. On Windows, run the installer
 for your CPU; the arm64 build runs natively on Windows on Arm and the x64 build
 also works there, through Windows' emulation, but slower.
 

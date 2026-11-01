@@ -6,3 +6,4 @@ src/edition-config.json
 smoke-out/
 packaging/ppa/build/
 *.snap
+packaging/flatpak/tree/
