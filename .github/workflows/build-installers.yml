@@ -25,7 +25,7 @@ name: Build installers
 
 on:
   push:
-    branches: [main, linux-distros]
+    branches: [main]
     tags:
       - 'v*'
   pull_request:
