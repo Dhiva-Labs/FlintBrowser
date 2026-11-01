@@ -60,6 +60,14 @@ if [ -n "${LICENSE_FILE:-}" ]; then
 fi
 # Whatever umask built the tree, ship world-readable, root-writable modes.
 chmod -R u+rwX,go+rX,go-w "$tree"
+# node-gyp-build addons (bufferutil) carry prebuilt binaries for every OS and
+# CPU, and node loads only the one for the running system: the arm64 .deb
+# holds an x86-64 linux-x64/bufferutil.node. Keep this architecture's only.
+case "$arch" in amd64) node_arch=x64 ;; arm64) node_arch=arm64 ;; esac
+while IFS= read -r -d '' d; do
+  case "$(basename "$d")" in "linux-$node_arch"*) ;; *) rm -rf "$d" ;; esac
+done < <(find "$tree" -type d -name prebuilds -path '*/node_modules/*' \
+  -exec find {} -mindepth 1 -maxdepth 1 -type d -print0 \;)
 
 # --- 2. Runtime dependencies ------------------------------------------------
 # rpm: every shared library the ELF files need that the package does not ship
