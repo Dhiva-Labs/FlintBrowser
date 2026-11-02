@@ -7,6 +7,7 @@
 const { ipcMain, app, dialog, nativeTheme, shell } = require('electron');
 const { resolveOmniInput, SEARCH_ENGINES } = require('./omni');
 const { PROVIDERS } = require('./doh');
+const { clearSiteData } = require('./sitedata');
 
 function registerIpc(ctx) {
   const { wm, stores, blocker, dl, menus, reader, doh } = ctx;
@@ -75,6 +76,17 @@ function registerIpc(ctx) {
   ipcMain.on('tabs:close', (event, id) => requireChrome(event).tabs.close(id));
   ipcMain.on('tabs:activate', (event, id) => requireChrome(event).tabs.activate(id));
   ipcMain.on('tabs:reopen', (event) => requireChrome(event).tabs.reopen());
+  ipcMain.on('tabs:move', (event, { id, index } = {}) => requireChrome(event).tabs.move(id, index));
+  ipcMain.on('tabs:mute', (event, id) => {
+    const w = requireChrome(event);
+    const t = w.tabs.byWebContentsId(id);
+    if (t) { t.wc.setAudioMuted(!t.wc.isAudioMuted()); w.tabs.sync(t); }
+  });
+  ipcMain.on('tabs:zoom-reset', (event) => {
+    const w = requireChrome(event);
+    const t = w.tabs.active;
+    if (t) { t.wc.setZoomLevel(0); w.tabs.sync(t); }
+  });
 
   ipcMain.on('nav:go', (event, dir) => {
     const w = requireChrome(event);
@@ -110,6 +122,7 @@ function registerIpc(ctx) {
       host,
       siteAllowed: blocker.isSiteAllowlisted(host),
       count: t ? t.blocked : 0,
+      total: blocker.totalBlocked,
     };
   });
 
@@ -122,6 +135,15 @@ function registerIpc(ctx) {
     const nowAllowed = blocker.toggleSite(host);
     if (t) t.wc.reload();
     return nowAllowed;
+  });
+
+  ipcMain.handle('shield:clear-site', async (event) => {
+    const w = requireChrome(event);
+    const t = w.tabs.active;
+    if (!t) return null;
+    const site = await clearSiteData(t.wc.session, t.wc.getURL());
+    if (site) t.wc.reload();
+    return site;
   });
 
   ipcMain.on('find:start', (event, { text, forward, first }) => {
@@ -146,6 +168,7 @@ function registerIpc(ctx) {
   });
 
   ipcMain.on('menu:popup', (event) => menus.hamburgerMenu(requireChrome(event)));
+  ipcMain.on('settings:open', (event) => requireChrome(event).tabs.create('flint://settings'));
   ipcMain.on('downloads:open', (event) => requireChrome(event).tabs.create('flint://downloads'));
   ipcMain.on('grabber:popup', (event) => menus.grabberMenu(requireChrome(event)));
 
@@ -229,7 +252,11 @@ function registerIpc(ctx) {
   ipcMain.handle('pages:download-action', (event, { id, action }) => { requirePages(event); return dl.action(id, action); });
   ipcMain.handle('pages:downloads-clear', (event) => { requirePages(event); dl.clearFinished(); return true; });
 
-  ipcMain.handle('pages:top-sites', (event) => { requirePages(event); return stores.history.topSites(12); });
+  ipcMain.handle('pages:top-sites', (event) => { requirePages(event); return stores.history.topSites(8); });
+  ipcMain.handle('pages:stats', (event) => {
+    requirePages(event);
+    return { blockedTotal: blocker.totalBlocked, adblockEnabled: stores.settings.get().adblockEnabled };
+  });
 
   ipcMain.handle('pages:torrents', (event) => {
     requirePages(event);

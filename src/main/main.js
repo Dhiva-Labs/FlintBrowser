@@ -72,6 +72,8 @@ function boot() {
     doh.apply(app, stores.settings.get().doh);
 
     const blocker = new AdBlocker(stores.settings);
+    blocker.totalBlocked = stores.stats.get().blockedTotal || 0;
+    setInterval(() => saveStats(ctx), 60_000).unref();
     // The engine is bundled inside the app (app.asar in packaged builds);
     // Electron's fs reads transparently through the asar archive.
     const enginePath = path.join(__dirname, '..', '..', 'build', 'adblock-engine.bin');
@@ -207,9 +209,18 @@ function boot() {
   app.on('before-quit', () => flushAll(ctx));
 }
 
+function saveStats(ctx) {
+  if (!ctx.stores || !ctx.blocker) return;
+  if (ctx.stores.stats.get().blockedTotal !== ctx.blocker.totalBlocked) {
+    ctx.stores.stats.set({ blockedTotal: ctx.blocker.totalBlocked });
+  }
+}
+
 function flushAll(ctx) {
   try {
     if (!ctx.stores) return;
+    saveStats(ctx);
+    ctx.stores.stats.flush();
     ctx.stores.settings.flush();
     ctx.stores.history.flush();
     ctx.stores.bookmarks.flush();

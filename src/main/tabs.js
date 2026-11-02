@@ -19,7 +19,11 @@ function navState(wc) {
 }
 
 class Tab {
-  constructor(fwin, url) {
+  /**
+   * `lazy` tabs (restored in the background) keep their URL and title but
+   * create no renderer until first activated, so a big session restores fast.
+   */
+  constructor(fwin, url, { lazy = false, title = '' } = {}) {
     this.win = fwin;
     this.view = new WebContentsView({
       webPreferences: {
@@ -39,13 +43,34 @@ class Tab {
     this.favicon = '';
     this.blocked = 0;
     this.httpsFallbackHost = null;
+    this.pendingUrl = null;
+    this.pendingTitle = '';
     this._wire();
-    if (url) this.load(url);
+    if (url && lazy) {
+      this.pendingUrl = url;
+      this.pendingTitle = title;
+      this.favicon = fwin.appCtx.stores.history.faviconOf(url);
+    } else if (url) {
+      this.load(url);
+    }
   }
 
   get wc() { return this.view.webContents; }
 
+  /** The URL this tab shows, including a not-yet-loaded restored tab. */
+  currentUrl() { return this.pendingUrl || this.wc.getURL() || ''; }
+
+  /** Load a restored tab's page the first time it is shown. */
+  wake() {
+    if (!this.pendingUrl) return;
+    const url = this.pendingUrl;
+    this.pendingUrl = null;
+    this.pendingTitle = '';
+    this.load(url);
+  }
+
   load(url, { httpsFallback = false } = {}) {
+    this.pendingUrl = null;
     if (httpsFallback) {
       try { this.httpsFallbackHost = new URL(url).hostname; } catch { this.httpsFallbackHost = null; }
     } else {
@@ -84,6 +109,14 @@ class Tab {
 
     wc.on('page-favicon-updated', (e, favicons) => {
       this.favicon = favicons && favicons.length ? favicons[favicons.length - 1] : '';
+      if (this.favicon && !this.win.incognito) this.win.appCtx.stores.history.setFavicon(wc.getURL(), this.favicon);
+      sync();
+    });
+
+    wc.on('audio-state-changed', sync);
+    wc.on('zoom-changed', (e, dir) => {
+      // Ctrl+wheel / pinch; keep the same 0.5 steps as the menu.
+      wc.setZoomLevel(wc.getZoomLevel() + (dir === 'in' ? 0.5 : -0.5));
       sync();
     });
 
@@ -142,14 +175,17 @@ class Tab {
   }
 
   snapshot(activeId, bookmarks) {
-    const url = this.wc.getURL() || '';
-    const { canBack, canFwd } = navState(this.wc);
+    const url = this.currentUrl();
+    const pending = !!this.pendingUrl;
+    const { canBack, canFwd } = pending ? { canBack: false, canFwd: false } : navState(this.wc);
+    let title = pending ? this.pendingTitle : this.wc.getTitle();
+    if (!title || title === url) title = url.startsWith('flint://') || !url ? 'New Tab' : url.replace(/^https?:\/\/(www\.)?/, '');
     return {
       id: this.id,
-      title: this.wc.getTitle() || 'New Tab',
+      title,
       url,
       favicon: this.favicon,
-      loading: this.wc.isLoading(),
+      loading: !pending && this.wc.isLoading(),
       active: this.id === activeId,
       blocked: this.blocked,
       canBack,
@@ -157,6 +193,12 @@ class Tab {
       starred: bookmarks.has(url),
       secure: /^(https|flint):/.test(url),
       internal: url.startsWith('flint://'),
+      pending,
+      // true/false: blocking on/off for this site; null: not a web page
+      shield: /^https?:/.test(url) ? this.win.appCtx.blocker.activeFor(url) : null,
+      audible: !pending && this.wc.isCurrentlyAudible(),
+      muted: this.wc.isAudioMuted(),
+      zoom: pending ? 100 : Math.round(this.wc.getZoomFactor() * 100),
     };
   }
 
@@ -175,13 +217,15 @@ class TabManager {
 
   get active() { return this.tabs.find((t) => t.id === this.activeId) || null; }
 
-  create(url, { background = false } = {}) {
-    const tab = new Tab(this.win, url || 'flint://home');
+  create(url, { background = false, lazy = false, title = '' } = {}) {
+    const tab = new Tab(this.win, url || 'flint://home', { lazy: lazy && background, title });
     this.tabs.push(tab);
     this.win.win.contentView.addChildView(tab.view);
     tab.view.setVisible(false);
     this.win.keepChromeOnTop();
-    if (!background || this.tabs.length === 1) this.activate(tab.id);
+    // A lazily restored tab is never auto-activated: the window activates its
+    // saved active tab once all tabs exist (WindowManager.create).
+    if (!background || (this.tabs.length === 1 && !tab.pendingUrl)) this.activate(tab.id);
     else this.sync();
     return tab;
   }
@@ -190,6 +234,7 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     this.activeId = id;
+    tab.wake();
     for (const t of this.tabs) t.view.setVisible(t.id === id);
     this.win.layout();
     tab.wc.focus();
@@ -200,7 +245,7 @@ class TabManager {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
-    const url = tab.wc.getURL();
+    const url = tab.currentUrl();
     if (url && url !== 'flint://home' && !this.win.incognito) {
       this.closedStack.push(url);
       if (this.closedStack.length > 25) this.closedStack.shift();
@@ -218,6 +263,16 @@ class TabManager {
     } else {
       this.sync();
     }
+  }
+
+  /** Drag-and-drop reordering from the tab strip. */
+  move(id, toIndex) {
+    const from = this.tabs.findIndex((t) => t.id === id);
+    if (from < 0) return;
+    const [tab] = this.tabs.splice(from, 1);
+    const to = Math.max(0, Math.min(this.tabs.length, toIndex | 0));
+    this.tabs.splice(to, 0, tab);
+    this.sync();
   }
 
   reopen() {

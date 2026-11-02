@@ -5,9 +5,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 const SEND = new Set([
   'omni:resolve', 'omni:navigate', 'tabs:new', 'tabs:close', 'tabs:activate', 'tabs:reopen',
   'nav:go', 'find:start', 'find:stop', 'chrome:overlay', 'win:ctl', 'menu:popup', 'downloads:open',
-  'grabber:popup',
+  'grabber:popup', 'tabs:move', 'tabs:mute', 'tabs:zoom-reset', 'settings:open',
 ]);
-const INVOKE = new Set(['omni:suggest', 'tab:star', 'shield:info', 'shield:toggle-site', 'grabber:count']);
+const INVOKE = new Set(['omni:suggest', 'tab:star', 'shield:info', 'shield:toggle-site', 'shield:clear-site', 'grabber:count']);
 const ON = new Set([
   'chrome:init', 'chrome:maximized', 'chrome:focus-omni', 'chrome:blur-omni', 'chrome:find-open',
   'tabs:update', 'active:update', 'find:result', 'downloads:badge', 'toast',

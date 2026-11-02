@@ -144,6 +144,21 @@ module.exports = async function smoke(ctx) {
     }
   });
 
+  await t('clearing one site removes its cookies and keeps other sites', async () => {
+    const { clearSiteData } = require('../src/main/sitedata');
+    const ses = w.tabs.active.wc.session;
+    await ses.cookies.set({ url: 'https://a.reset.flint.example/', name: 'host_only', value: '1' });
+    await ses.cookies.set({ url: 'https://reset.flint.example/', domain: '.reset.flint.example', name: 'whole_site', value: '1', secure: true });
+    await ses.cookies.set({ url: 'https://keep.flint-other.example/', name: 'keep', value: '1' });
+    const site = await clearSiteData(ses, 'https://a.reset.flint.example/watch?v=1');
+    if (site !== 'flint.example' && site !== 'reset.flint.example') throw new Error('unexpected site: ' + site);
+    const left = (await ses.cookies.get({})).map((c) => c.name);
+    if (left.includes('host_only') || left.includes('whole_site')) throw new Error('site cookies survived: ' + left);
+    if (!left.includes('keep')) throw new Error('another site lost its cookie');
+    if (await clearSiteData(ses, 'flint://settings') !== null) throw new Error('cleared an internal page');
+    await ses.cookies.remove('https://keep.flint-other.example/', 'keep');
+  });
+
   await t('history recorded the visit', async () => {
     const rows = ctx.stores.history.query('example', 10);
     if (!rows.some((r) => r.url.includes('example.com'))) throw new Error('no history entry');
