@@ -63,9 +63,9 @@ for other installs you can delete the user-data folder yourself.
 - No crash reports are uploaded.
 - No update checks of its own: updates arrive through the Microsoft Store (or
   your package manager).
-- No filter-list downloads. The EasyList and EasyPrivacy rules used for ad and
-  tracker blocking are compiled into Flint when it is built, and are refreshed
-  only by installing a newer version.
+- No filter-list downloads. The EasyList, EasyPrivacy and uBlock Origin rules
+  used for ad and tracker blocking are compiled into Flint when it is built,
+  and are refreshed only by installing a newer version.
 - No Google account, Safe Browsing, sync or other cloud services.
 
 ## Permissions

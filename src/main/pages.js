@@ -5,13 +5,19 @@
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { protocol, net } = require('electron');
+const { STUB_SCHEME } = require('./adblock');
 
 const PAGES_DIR = path.join(__dirname, '..', 'pages');
 const KNOWN = new Set(['home', 'settings', 'history', 'bookmarks', 'downloads', 'about', 'reader', 'torrents']);
 
 function registerScheme() {
+  // Electron accepts a single call, so every privileged scheme is listed here.
   protocol.registerSchemesAsPrivileged([
     { scheme: 'flint', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+    // Neutered stand-ins (noop.js, ad_status.js, ...) that filter rules
+    // redirect blocked requests to; see adblock.js. They replace resources
+    // the page already allowed, so the page's CSP must not reject them.
+    { scheme: STUB_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, bypassCSP: true } },
   ]);
 }
 

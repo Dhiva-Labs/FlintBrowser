@@ -97,6 +97,7 @@
   "dependencies": {
     "@ghostery/adblocker": "^2.18.1",
     "@mozilla/readability": "^0.6.0",
+    "tldts-experimental": "^7.4.9",
     "webtorrent": "^1.9.7"
   }
 }

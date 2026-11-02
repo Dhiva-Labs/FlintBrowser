@@ -155,6 +155,34 @@ function registerIpc(ctx) {
     return ctx.grabber && t ? ctx.grabber.count(t.id) : 0;
   });
 
+  // ---------- web pages (cosmetic blocking, see preload-pages.js) ----------
+
+  const frameUrls = (event, claimed) => {
+    let url = '';
+    let top = '';
+    try {
+      url = (event.senderFrame && event.senderFrame.url) || '';
+      top = (event.senderFrame && event.senderFrame.top && event.senderFrame.top.url) || '';
+    } catch { /* frame gone */ }
+    // During the preload the frame may not report its new URL yet.
+    if (!url && typeof claimed === 'string') url = claimed;
+    return { url, top: top || url };
+  };
+
+  ipcMain.on('adblock:cosmetics', (event, claimed) => {
+    let payload = null;
+    try {
+      const { url, top } = frameUrls(event, claimed);
+      payload = blocker.cosmetics(url, top);
+    } catch { /* never leave a sync sender hanging */ }
+    event.returnValue = payload;
+  });
+
+  ipcMain.handle('adblock:dom', (event, claimed, features) => {
+    const { url, top } = frameUrls(event, claimed);
+    return blocker.domStyles(url, top, features && typeof features === 'object' ? features : {});
+  });
+
   // ---------- internal pages ----------
 
   ipcMain.handle('pages:boot', (event) => {

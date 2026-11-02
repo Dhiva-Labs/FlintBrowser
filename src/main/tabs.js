@@ -26,6 +26,9 @@ class Tab {
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
+        // Runs the (sandboxed) preload in iframes too, so cosmetic blocking
+        // reaches embedded players and ad frames.
+        nodeIntegrationInSubFrames: true,
         preload: PAGES_PRELOAD,
         partition: fwin.partition, // undefined => default session
         safeDialogs: true,
