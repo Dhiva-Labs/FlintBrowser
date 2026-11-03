@@ -71,6 +71,94 @@ module.exports = async function smoke(ctx) {
     }
   });
 
+  await t('cosmetic blocking hides ad elements, in iframes too', async () => {
+    // uBlock exempts localhost/127.0.0.1 from element hiding, so serve the
+    // test page under a public-looking (reserved .example) hostname.
+    const host = 'cosmetic.flint.example';
+    const frame = '<div id="ad_banner">ad</div><div id="ok">content</div>';
+    const page = `<div id="ok">content</div><iframe src="http://${host}/frame"></iframe>
+      <script>setTimeout(() => { const d = document.createElement('div'); d.className = 'sponsored-post'; d.textContent = 'ad'; document.body.appendChild(d); }, 300);</script>`;
+    const ses = w.tabs.active.wc.session;
+    const { net } = require('electron');
+    ses.protocol.handle('http', (req) => {
+      const u = new URL(req.url);
+      if (u.hostname !== host) return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      // The ad element is added after load, so the DOM watcher has to find it.
+      return new Response(u.pathname === '/frame' ? frame : page, { headers: { 'content-type': 'text/html' } });
+    });
+    try {
+      const tab = w.tabs.create(`http://${host}/`);
+      await settle(300);
+      await waitLoad(tab.wc);
+      await settle(1200);
+      const top = await tab.wc.executeJavaScript(`({
+        ad: getComputedStyle(document.querySelector('.sponsored-post')).display,
+        ok: getComputedStyle(document.getElementById('ok')).display,
+        bridge: typeof window.flintPages,
+      })`);
+      if (top.ad !== 'none') throw new Error('late-added ad element still visible');
+      if (top.ok === 'none') throw new Error('content element hidden');
+      if (top.bridge !== 'undefined') throw new Error('internal-pages bridge exposed to a web page');
+      const sub = tab.wc.mainFrame.frames[0];
+      const inFrame = await sub.executeJavaScript(`getComputedStyle(document.getElementById('ad_banner')).display`);
+      if (inFrame !== 'none') throw new Error('ad element in iframe still visible');
+      w.tabs.close(tab.id);
+    } finally {
+      ses.protocol.unhandle('http');
+    }
+  });
+
+  await t('redirect rules serve stand-ins instead of failing the request', async () => {
+    // YouTube's ad_status.js check and gpt.js/analytics.js callers expect the
+    // neutered resource to load; a failed request breaks pages or flags the
+    // blocker.
+    const host = 'stubs.flint.example';
+    const page = `<script>
+      window.results = {};
+      const s = document.createElement('script');
+      s.src = 'https://static.doubleclick.net/instream/ad_status.js';
+      s.onload = () => { window.results.script = 'loaded:' + window.google_ad_status; };
+      s.onerror = () => { window.results.script = 'error'; };
+      document.head.appendChild(s);
+      fetch('https://googleads.g.doubleclick.net/pagead/id', { credentials: 'include' })
+        .then((r) => r.text().then((t) => { window.results.xhr = r.status + ':' + t.length; }))
+        .catch((e) => { window.results.xhr = 'error:' + e.message; });
+    </script>`;
+    const ses = w.tabs.active.wc.session;
+    const { net } = require('electron');
+    ses.protocol.handle('http', (req) => {
+      if (new URL(req.url).hostname !== host) return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      return new Response(page, { headers: { 'content-type': 'text/html', 'content-security-policy': "script-src 'unsafe-inline' https:; connect-src https:" } });
+    });
+    try {
+      const tab = w.tabs.create(`http://${host}/`);
+      await settle(300);
+      await waitLoad(tab.wc);
+      await settle(800);
+      const r = await tab.wc.executeJavaScript('window.results');
+      if (r.script !== 'loaded:1') throw new Error('ad_status.js stand-in: ' + r.script);
+      if (r.xhr !== '200:0') throw new Error('pagead/id stand-in: ' + r.xhr);
+      w.tabs.close(tab.id);
+    } finally {
+      ses.protocol.unhandle('http');
+    }
+  });
+
+  await t('clearing one site removes its cookies and keeps other sites', async () => {
+    const { clearSiteData } = require('../src/main/sitedata');
+    const ses = w.tabs.active.wc.session;
+    await ses.cookies.set({ url: 'https://a.reset.flint.example/', name: 'host_only', value: '1' });
+    await ses.cookies.set({ url: 'https://reset.flint.example/', domain: '.reset.flint.example', name: 'whole_site', value: '1', secure: true });
+    await ses.cookies.set({ url: 'https://keep.flint-other.example/', name: 'keep', value: '1' });
+    const site = await clearSiteData(ses, 'https://a.reset.flint.example/watch?v=1');
+    if (site !== 'flint.example' && site !== 'reset.flint.example') throw new Error('unexpected site: ' + site);
+    const left = (await ses.cookies.get({})).map((c) => c.name);
+    if (left.includes('host_only') || left.includes('whole_site')) throw new Error('site cookies survived: ' + left);
+    if (!left.includes('keep')) throw new Error('another site lost its cookie');
+    if (await clearSiteData(ses, 'flint://settings') !== null) throw new Error('cleared an internal page');
+    await ses.cookies.remove('https://keep.flint-other.example/', 'keep');
+  });
+
   await t('history recorded the visit', async () => {
     const rows = ctx.stores.history.query('example', 10);
     if (!rows.some((r) => r.url.includes('example.com'))) throw new Error('no history entry');

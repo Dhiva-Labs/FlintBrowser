@@ -46,7 +46,7 @@ file sharing.
 
 ## Features
 
-- **Built-in ad & tracker blocking** — EasyList + EasyPrivacy applied at the network level (not an extension), with a per-site toggle and live blocked counters on every tab.
+- **Built-in ad & tracker blocking** — EasyList, EasyPrivacy and uBlock Origin's filters, built in rather than an extension: network blocking, element hiding and uBlock's scriptlets, which is what stops YouTube video ads. Per-site toggle and live blocked counters on every tab.
 - **Secure DNS (DNS-over-HTTPS)** — one click to encrypt your DNS lookups via Cloudflare, Quad9, Google, AdGuard or your own resolver.
 - **Turbo downloads ⚡** — Flint's own multi-connection segmented downloader with pause/resume, right in the download manager (right-click any link → *Turbo Download Link*).
 - **Reader mode** — distraction-free article view (Ctrl+Alt+R) with font and sepia/dark controls.
@@ -133,7 +133,7 @@ also works there, through Windows' emulation, but slower.
 git clone https://github.com/Dhiva-Labs/FlintBrowser.git
 cd FlintBrowser
 npm install
-npm run build:engine   # compile the adblock engine from EasyList/EasyPrivacy
+npm run build:engine   # compile the adblock engine from EasyList/EasyPrivacy/uBlock Origin
 npm run build:icons
 npm start              # runs the Plus edition in dev; use npm run start:standard for standard
 ```

@@ -40,8 +40,7 @@ function buildMenus(ctx) {
     zoom: (delta) => withTab((t, w) => {
       const level = delta === 0 ? 0 : t.wc.getZoomLevel() + delta;
       t.wc.setZoomLevel(level);
-      const pct = Math.round(Math.pow(1.2, level) * 100);
-      w.sendChrome('toast', { text: `Zoom ${pct}%` });
+      w.tabs.sync(t); // the address bar shows a zoom chip while not at 100%
     })(),
     fullscreen: withWin((w) => w.win.setFullScreen(!w.win.isFullScreen())),
     devtools: withTab((t) => t.wc.toggleDevTools()),

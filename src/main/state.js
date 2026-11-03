@@ -101,6 +101,24 @@ class HistoryStore {
     if (e && title) { e.t = title; this.store.save(); }
   }
 
+  titleOf(url) {
+    const e = this.store.get().entries[url];
+    return e ? e.t : '';
+  }
+
+  faviconOf(url) {
+    const e = this.store.get().entries[url];
+    return (e && e.f) || '';
+  }
+
+  setFavicon(url, favicon) {
+    const e = this.store.get().entries[url];
+    if (e && /^(https?:|data:image\/)/.test(favicon) && favicon.length < 4096 && e.f !== favicon) {
+      e.f = favicon;
+      this.store.save();
+    }
+  }
+
   _prune(entries) {
     const keys = Object.keys(entries);
     if (keys.length <= HISTORY_CAP) return;
@@ -146,9 +164,14 @@ class HistoryStore {
       try { origin = new URL(url).origin; } catch { continue; }
       const cur = byOrigin.get(origin);
       const score = e.n + Math.max(0, 1 - (Date.now() - e.ts) / (30 * 864e5));
-      if (!cur || score > cur.score) byOrigin.set(origin, { url, title: e.t, score: (cur ? cur.score : 0) + score });
+      const total = (cur ? cur.score : 0) + score;
+      if (!cur || score > cur.best) byOrigin.set(origin, { url, title: e.t, favicon: e.f || (cur && cur.favicon) || '', best: score, score: total });
+      else { cur.score = total; if (!cur.favicon && e.f) cur.favicon = e.f; }
     }
-    return [...byOrigin.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+    return [...byOrigin.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ url, title, favicon }) => ({ url, title, favicon }));
   }
 
   remove(url) {
@@ -201,6 +224,7 @@ function createStores(baseDir) {
     bookmarks: new BookmarkStore(path.join(baseDir, 'bookmarks.json')),
     downloads: new JsonStore(path.join(baseDir, 'downloads.json'), { items: [] }),
     session: new JsonStore(path.join(baseDir, 'session.json'), { windows: [] }),
+    stats: new JsonStore(path.join(baseDir, 'stats.json'), { blockedTotal: 0 }),
     torrents: new JsonStore(path.join(baseDir, 'torrents.json'), { magnets: [] }),
   };
 }

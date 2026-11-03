@@ -139,7 +139,13 @@ class WindowManager {
     const fwin = new FlintWindow(this.appCtx, { incognito });
     this.windows.push(fwin);
     const list = urls.length ? urls : ['flint://home'];
-    list.forEach((u, i) => fwin.tabs.create(u, { background: i !== activeIndex }));
+    const history = this.appCtx.stores.history;
+    list.forEach((u, i) => fwin.tabs.create(u, {
+      background: i !== activeIndex,
+      lazy: true, // only the active tab loads now; the rest load when opened
+      title: history.titleOf(u),
+    }));
+    if (!fwin.tabs.active && fwin.tabs.tabs.length) fwin.tabs.activate(fwin.tabs.tabs[0].id);
     return fwin;
   }
 
@@ -172,7 +178,7 @@ class WindowManager {
     const wins = this.windows
       .filter((w) => !w.incognito)
       .map((w) => ({
-        tabs: w.tabs.tabs.map((t) => t.wc.getURL()).filter((u) => u && !u.startsWith('devtools:')),
+        tabs: w.tabs.tabs.map((t) => t.currentUrl()).filter((u) => u && !u.startsWith('devtools:')),
         active: Math.max(0, w.tabs.tabs.findIndex((t) => t.id === w.tabs.activeId)),
       }))
       .filter((w) => w.tabs.length);

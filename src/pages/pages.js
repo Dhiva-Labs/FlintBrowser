@@ -42,20 +42,46 @@ if (page === 'home') {
     const v = $('q').value.trim();
     if (v) go(v);
   });
+  // Letter tiles get a stable per-site hue so the grid is easy to scan.
+  const hueOf = (host) => [...host].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  const letterFor = (tile, host) => {
+    tile.textContent = (host[0] || '·').toUpperCase();
+    tile.classList.add('letter');
+    tile.style.background = `hsl(${hueOf(host)} 55% 48%)`;
+  };
   call('pages:top-sites').then((sites) => {
     const dial = $('dial');
     for (const s of sites) {
+      let host = '';
+      try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* keep blank */ }
       const a = el('a');
-      a.href = '#';
+      a.href = s.url;
+      a.title = s.title ? `${s.title}\n${host}` : host;
       const tile = el('div', 'tile');
-      try { tile.textContent = new URL(s.url).hostname.replace(/^www\./, '')[0].toUpperCase(); } catch { tile.textContent = '·'; }
-      const t = el('div', 't');
-      try { t.textContent = new URL(s.url).hostname.replace(/^www\./, ''); } catch { t.textContent = s.title; }
-      a.appendChild(tile); a.appendChild(t);
-      a.title = s.title;
+      if (s.favicon) {
+        const img = el('img');
+        img.alt = '';
+        img.src = s.favicon;
+        img.onerror = () => { img.remove(); letterFor(tile, host); };
+        tile.appendChild(img);
+      } else {
+        letterFor(tile, host);
+      }
+      const t = el('div', 't', host || s.title);
+      a.append(tile, t);
       a.addEventListener('click', (e) => { e.preventDefault(); go(s.url); });
       dial.appendChild(a);
     }
+  });
+  call('pages:stats').then(({ blockedTotal, adblockEnabled }) => {
+    const stat = $('stat');
+    stat.classList.toggle('off', !adblockEnabled);
+    if (!adblockEnabled) $('stat-text').textContent = 'Ad & tracker blocking is off';
+    else {
+      const b = el('b', null, Number(blockedTotal || 0).toLocaleString());
+      $('stat-text').append(b, ' ads & trackers blocked so far');
+    }
+    stat.hidden = false;
   });
 }
 
