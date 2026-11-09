@@ -195,7 +195,7 @@ function buildMenus(ctx) {
 
     if (params.linkURL && /^magnet:/i.test(params.linkURL) && ctx.torrents) {
       items.push(
-        { label: 'Open Magnet in Flint', click: () => ctx.handleMagnet(params.linkURL, fwin) },
+        { label: 'Open Magnet in Flint', click: () => ctx.handleMagnet(params.linkURL, fwin, { trusted: true }) },
         { label: 'Copy Magnet Link', click: () => clipboard.writeText(params.linkURL) },
         { type: 'separator' },
       );

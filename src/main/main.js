@@ -100,15 +100,51 @@ function boot() {
         }
       };
     }
+    // A page can navigate to a magnet link or serve a .torrent download
+    // with no action from the user. Adding it would start downloading
+    // content the page chose, upload it to the swarm and open DHT/TCP
+    // listeners, so anything that did not start from Flint's own UI is
+    // confirmed first. One prompt at a time: a page looping on magnet
+    // links gets a single dialog, not a stack of them.
+    let torrentPromptOpen = false;
+    const confirmTorrent = async (source, win) => {
+      if (torrentPromptOpen) return false;
+      torrentPromptOpen = true;
+      try {
+        const { dialog } = require('electron');
+        const { describeSource } = require('./torrents');
+        const d = describeSource(source);
+        const w = win || (ctx.wm && ctx.wm.focused());
+        const { response } = await dialog.showMessageBox(w ? w.win : undefined, {
+          type: 'question',
+          buttons: ['Cancel', 'Add torrent'],
+          defaultId: 0,
+          cancelId: 0,
+          message: 'Add this torrent?',
+          detail: `${d.name}\n${d.detail}\n\nFlint will download it to your Downloads folder and upload it to other peers while it is active.`,
+        });
+        return response === 1;
+      } catch {
+        return false;
+      } finally {
+        torrentPromptOpen = false;
+      }
+    };
+
     if (edition.features.torrents) {
       const { TorrentEngine } = require('./torrents');
       ctx.torrents = new TorrentEngine(stores.torrents, () => dl.dir());
       ctx.torrents.onChange = () => { if (ctx.wm) ctx.wm.broadcast('torrents:badge', ctx.torrents.summary()); };
-      dl.onTorrentFile = (url) => ctx.torrents.add(url);
+      dl.onTorrentFile = async (url) => {
+        if (await confirmTorrent(url)) ctx.torrents.add(url);
+      };
     }
 
-    ctx.handleMagnet = (url, win) => {
+    // opts.trusted is set only by Flint's own menus, where the user has
+    // already chosen to open the magnet.
+    ctx.handleMagnet = async (url, win, opts = {}) => {
       if (!ctx.torrents) return;
+      if (!opts.trusted && !(await confirmTorrent(url, win))) return;
       ctx.torrents.add(url);
       (win || ctx.wm.focused()).tabs.create('flint://torrents');
     };
