@@ -10,6 +10,8 @@
   secure DNS, turbo downloads and reader mode built in — and zero telemetry.
 </p>
 
+**Documentation:** step-by-step guides at [learn.dhivalabs.com](https://learn.dhivalabs.com/apps/flint-browser/): [install](https://learn.dhivalabs.com/apps/flint-browser/install) · [beginner guide](https://learn.dhivalabs.com/apps/flint-browser/getting-started) · [troubleshooting](https://learn.dhivalabs.com/apps/flint-browser/faq).
+
 <div align="center">
 
 [![ARM64 builds](https://github.com/Dhiva-Labs/FlintBrowser/actions/workflows/build-installers.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/FlintBrowser/actions/workflows/build-installers.yml)
