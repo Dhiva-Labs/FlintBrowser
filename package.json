@@ -64,7 +64,9 @@
       "priority": "optional"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {
@@ -80,8 +82,12 @@
       "applicationId": "FlintBrowser",
       "displayName": "Flint Browser",
       "backgroundColor": "#22252b",
-      "languages": ["en-US"],
-      "capabilities": ["internetClient"],
+      "languages": [
+        "en-US"
+      ],
+      "capabilities": [
+        "internetClient"
+      ],
       "minVersion": "10.0.17763.0",
       "maxVersionTested": "10.0.22621.0",
       "showNameOnTiles": true,
@@ -89,7 +95,7 @@
     }
   },
   "devDependencies": {
-    "electron": "^43.2.0",
+    "electron": "^43.8.7",
     "electron-builder": "^26.15.3",
     "png-to-ico": "^2.1.8",
     "sharp": "^0.35.3"
