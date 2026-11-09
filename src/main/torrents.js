@@ -14,6 +14,40 @@ const MAGNET_RE = /^magnet:\?.*xt=urn:bt/i;
 
 function isMagnet(s) { return typeof s === 'string' && MAGNET_RE.test(s.trim()); }
 
+/**
+ * What to show the user before a torrent that a page supplied is added: the
+ * display name and info hash of a magnet, or the file name and host of a
+ * .torrent URL. Every part is attacker-chosen text, so control characters
+ * are dropped and lengths capped before it reaches a dialog.
+ */
+function describeSource(source) {
+  const s = typeof source === 'string' ? source.trim() : '';
+  const clip = (v, n) => {
+    const t = String(v || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+    return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+  };
+  const decode = (v) => { try { return decodeURIComponent(v); } catch { return v; } };
+  if (isMagnet(s)) {
+    const ih = (/xt=urn:btih:([a-z0-9]+)/i.exec(s) || [])[1] || '';
+    const dn = (/[?&]dn=([^&]*)/i.exec(s) || [])[1] || '';
+    return {
+      kind: 'magnet',
+      name: clip(decode(dn.replace(/\+/g, ' ')), 120) || 'Unnamed torrent',
+      detail: `Info hash: ${clip(ih.toLowerCase(), 64)}`,
+    };
+  }
+  try {
+    const u = new URL(s);
+    return {
+      kind: 'file',
+      name: clip(decode(u.pathname.split('/').pop() || ''), 120) || 'Torrent file',
+      detail: `From: ${clip(u.host, 100)}`,
+    };
+  } catch {
+    return { kind: 'file', name: 'Torrent file', detail: '' };
+  }
+}
+
 class TorrentEngine {
   constructor(store, dirFn) {
     this.store = store;      // JsonStore { magnets: [] }
@@ -165,4 +199,4 @@ class TorrentEngine {
   }
 }
 
-module.exports = { TorrentEngine, isMagnet };
+module.exports = { TorrentEngine, isMagnet, describeSource };
