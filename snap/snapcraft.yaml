@@ -58,7 +58,9 @@ grade: stable
 confinement: strict
 license: MIT
 icon: build/icons/256x256.png
-website: https://github.com/Dhiva-Labs/FlintBrowser
+website:
+  - https://github.com/Dhiva-Labs/FlintBrowser
+  - https://learn.dhivalabs.com/apps/flint-browser/
 source-code: https://github.com/Dhiva-Labs/FlintBrowser
 issues: https://github.com/Dhiva-Labs/FlintBrowser/issues
 contact: dhivakar1010@gmail.com
